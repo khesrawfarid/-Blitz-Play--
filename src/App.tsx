@@ -176,6 +176,7 @@ export default function App() {
   const [customImage, setCustomImage] = useState<string | null>(null);
   const [useAiImage, setUseAiImage] = useState(true);
   const [isLangOpen, setIsLangOpen] = useState(false);
+  const [generationError, setGenerationError] = useState(false);
 
   const t = translations[lang];
 
@@ -195,11 +196,12 @@ export default function App() {
   const handleGenerateGame = async () => {
     if (!aiPrompt.trim()) return;
     setIsGenerating(true);
+    setGenerationError(false);
     
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-pro-preview",
         contents: `Create a simple, playable HTML5 game based on this prompt: "${aiPrompt}". 
         The game should be fully contained in a single HTML string (including CSS and JS). 
         It should be responsive, use modern graphics (canvas or DOM), and be playable with mouse/touch or keyboard.
@@ -223,7 +225,9 @@ export default function App() {
         }
       });
 
-      const result = JSON.parse(response.text || "{}");
+      let responseText = response.text || "{}";
+      responseText = responseText.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
+      const result = JSON.parse(responseText);
       
       const newGame: Game = {
         id: Date.now().toString(),
@@ -245,7 +249,7 @@ export default function App() {
     } catch (error) {
       console.error("Error generating game:", error);
       setIsGenerating(false);
-      alert("Fehler beim Generieren des Spiels. Bitte versuche es erneut.");
+      setGenerationError(true);
     }
   };
 
@@ -700,7 +704,7 @@ export default function App() {
                     exit={{ opacity: 0, y: -10 }}
                     className="absolute right-0 top-full mt-2 bg-bg-dark border border-white/10 rounded-xl overflow-hidden z-50"
                   >
-                    {(['de', 'en', 'es', 'dari'] as const).map((l) => (
+                    {(['de', 'en', 'es', 'da'] as const).map((l) => (
                       <button
                         key={l}
                         onClick={() => {
@@ -709,7 +713,7 @@ export default function App() {
                         }}
                         className={`w-full px-4 py-2 text-left hover:bg-white/5 transition-colors ${lang === l ? 'text-play-blue' : 'text-white'}`}
                       >
-                        {l === 'dari' ? 'DARI' : l.toUpperCase()}
+                        {l.toUpperCase()}
                       </button>
                     ))}
                   </motion.div>
@@ -969,6 +973,12 @@ export default function App() {
                   ) : <Zap size={24} />}
                   {isGenerating ? "Generiere..." : t.generate}
                 </button>
+                
+                {generationError && (
+                  <div className="mt-4 p-4 bg-red-500/20 border border-red-500/50 rounded-xl text-red-400 text-center font-bold">
+                    {t.generateError}
+                  </div>
+                )}
               </div>
 
               <div className="mt-12 grid grid-cols-2 gap-6">

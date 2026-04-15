@@ -146,7 +146,7 @@ export const translations = {
     generateError: "Error al generar el juego. Por favor, inténtalo de nuevo.",
     promptLabel: "Describe tu juego...",
   },
-  dari: {
+  da: {
     playNow: "حالا بازی کن ⚡",
     randomGame: "بازی تصادفی",
     home: "خانه",
