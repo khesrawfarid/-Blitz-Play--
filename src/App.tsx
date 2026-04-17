@@ -1,6 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI, Type } from '@google/genai';
 import { 
   Zap, 
   Gamepad2, 
@@ -36,11 +35,31 @@ interface Game {
 }
 
 // --- Mock Data ---
+const ALL_IQ_QUESTIONS = [
+  { q: "Was ist das nächste Element: 2, 4, 8, 16, ...?", options: ["32", "24", "18", "64"], a: "32" },
+  { q: "Wenn alle A auch B sind und einige B auch C sind, sind dann einige A auch C?", options: ["Ja", "Nein", "Bestimmbar"], a: "Bestimmbar" },
+  { q: "Welche Zahl passt nicht in die Reihe? 3, 5, 7, 9, 11, 13", options: ["3", "7", "9", "11"], a: "9" },
+  { q: "Ein Schläger und ein Ball kosten zusammen 1.10$. Der Schläger kostet 1.00$ mehr als der Ball. Wie viel kostet der Ball?", options: ["0.10$", "0.05$", "0.15$", "1.00$"], a: "0.05$" },
+  { q: "Wenn 5 Maschinen in 5 Minuten 5 Teile herstellen, wie lange brauchen 100 Maschinen für 100 Teile?", options: ["100 Minuten", "50 Minuten", "5 Minuten", "1 Minute"], a: "5 Minuten" },
+  { q: "Welches Wort passt nicht zu den anderen?", options: ["Apfel", "Banane", "Karotte", "Mango"], a: "Karotte" },
+  { q: "Ein See ist mit Seerosen bedeckt. Jeden Tag verdoppelt sich die Fläche. Es dauert 48 Tage, bis der See voll ist. Wann war er halb voll?", options: ["Tag 24", "Tag 47", "Tag 26", "Tag 46"], a: "Tag 47" },
+  { q: "Wenn du von 100 immer wieder 7 abziehst, was ist die kleinste positive Zahl, die du erreichst?", options: ["1", "2", "3", "4"], a: "2" },
+  { q: "Welcher Tag ist der Tag nach dem Tag vor gestern, wenn morgen Sonntag ist?", options: ["Donnerstag", "Freitag", "Samstag", "Mittwoch"], a: "Freitag" },
+  { q: "Welche Zahl kommt als nächstes: 1, 1, 2, 3, 5, 8, 13, ...?", options: ["18", "21", "24", "15"], a: "21" },
+  { q: "Welches Wort bedeutet das Gegenteil von 'stets'?", options: ["Immer", "Oft", "Manchmal", "Nie"], a: "Nie" },
+  { q: "Ein Arzt gibt dir 3 Tabletten, du sollst jede halbe Stunde eine nehmen. Wie lange reichen sie?", options: ["1 Stunde", "1.5 Stunden", "2 Stunden", "3 Stunden"], a: "1 Stunde" },
+  { q: "Ein Quadrat hat wie viele Symmetrieachsen?", options: ["2", "4", "8", "Unendlich"], a: "4" },
+  { q: "Welche Form fügt sich logisch in diese Reihe ein: Dreieck, Viereck, Fünfeck, ...?", options: ["Kreis", "Sechseck", "Oval", "Achteck"], a: "Sechseck" },
+  { q: "Wie viele Monate haben 28 Tage?", options: ["1", "Alle 12", "Keiner", "6"], a: "Alle 12" },
+  { q: "Ein Vater ist 4 mal so alt wie sein Sohn. In 20 Jahren wird er doppelt so alt sein. Wie alt ist der Vater jetzt?", options: ["40", "32", "48", "60"], a: "40" }
+];
+
 const INITIAL_GAMES: Game[] = [
   { id: '1', title: 'Blitz Clicker', thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400&h=250', genre: 'speed', difficulty: 'easy', isAI: false, isMultiplayer: false },
   { id: '2', title: 'Neon Memory', thumbnail: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=400&h=250', genre: 'puzzle', difficulty: 'medium', isAI: true, isMultiplayer: false },
   { id: '7', title: 'Math Blitz', thumbnail: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&q=80&w=400&h=250', genre: 'puzzle', difficulty: 'medium', isAI: false, isMultiplayer: false },
   { id: '8', title: 'Reaction Master', thumbnail: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&q=80&w=400&h=250', genre: 'speed', difficulty: 'hard', isAI: false, isMultiplayer: true },
+  { id: 'iq', title: 'IQ Test', thumbnail: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&q=80&w=400&h=250', genre: 'puzzle', difficulty: 'hard', isAI: true, isMultiplayer: false },
   { id: 'worldfront', title: 'WorldFront', thumbnail: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=400&h=250', genre: 'battle', difficulty: 'hard', isAI: false, isMultiplayer: false },
 ];
 
@@ -80,7 +99,7 @@ const Logo = ({ size = "md" }: { size?: "sm" | "md" | "lg" }) => {
 };
 
 const GameCard = ({ game, t, onClick, onDelete }: { game: Game, t: any, onClick: () => void, onDelete?: () => void, key?: string }) => {
-  const isPlayable = ['1', '2', '7', '8'].includes(game.id) || game.isAI;
+  const isPlayable = ['1', '2', '7', '8', 'iq'].includes(game.id) || game.isAI;
 
   return (
     <div
@@ -124,7 +143,7 @@ const GameCard = ({ game, t, onClick, onDelete }: { game: Game, t: any, onClick:
             <Cpu size={12} /> AI
           </div>
         )}
-        {game.isAI && onDelete && !['1', '2', '7', '8', 'worldfront'].includes(game.id) && (
+        {game.isAI && onDelete && !['1', '2', '7', '8', 'worldfront', 'iq'].includes(game.id) && (
           <button 
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 backdrop-blur-md p-1.5 rounded-md text-white transition-colors z-10"
@@ -199,35 +218,19 @@ export default function App() {
     setGenerationError(false);
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
-      const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
-        contents: `Create a simple, playable HTML5 game based on this prompt: "${aiPrompt}". 
-        The game should be fully contained in a single HTML string (including CSS and JS). 
-        It should be responsive, use modern graphics (canvas or DOM), and be playable with mouse/touch or keyboard.
-        Also provide a short, descriptive prompt for an AI image generator to create a thumbnail for this game.`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              htmlCode: {
-                type: Type.STRING,
-                description: "The complete HTML code for the game, including <style> and <script> tags."
-              },
-              imagePrompt: {
-                type: Type.STRING,
-                description: "A prompt for an image generator to create a thumbnail for this game."
-              }
-            },
-            required: ["htmlCode", "imagePrompt"]
-          }
-        }
+      const resp = await fetch("/api/generate-game", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ prompt: aiPrompt })
       });
+      
+      if (!resp.ok) {
+        throw new Error(`Server returned ${resp.status}`);
+      }
 
-      let responseText = response.text || "{}";
-      responseText = responseText.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
-      const result = JSON.parse(responseText);
+      const result = await resp.json();
       
       const newGame: Game = {
         id: Date.now().toString(),
@@ -266,6 +269,10 @@ export default function App() {
     // Math Game State
     const [problem, setProblem] = useState({ a: 0, b: 0, op: '+', ans: 0 });
     const [input, setInput] = useState('');
+
+    // IQ Game State
+    const [iqQuestionIdx, setIqQuestionIdx] = useState(0);
+    const [currentIqQuestions, setCurrentIqQuestions] = useState(ALL_IQ_QUESTIONS.slice(0, 8));
 
     // AI Game State
     const [fallingObjects, setFallingObjects] = useState<{id: number, x: number, y: number, emoji: string}[]>([]);
@@ -421,7 +428,7 @@ export default function App() {
 
     const startGame = () => {
       setScore(0);
-      setTimeLeft(game.id === '2' ? 60 : 15);
+      setTimeLeft(game.id === '2' ? 60 : game.id === 'iq' ? -1 : 15);
       setIsPlaying(true);
       if (game.id === '1') spawnTarget();
       if (game.id === '2') initMemory();
@@ -429,6 +436,11 @@ export default function App() {
       if (game.id === '8') {
         setReactionState('waiting');
         setReactionTime(0);
+      }
+      if (game.id === 'iq') {
+        const shuffled = [...ALL_IQ_QUESTIONS].sort(() => 0.5 - Math.random()).slice(0, 8);
+        setCurrentIqQuestions(shuffled);
+        setIqQuestionIdx(0);
       }
     };
 
@@ -485,9 +497,9 @@ export default function App() {
               />
             </div>
             
-            {!isPlaying && timeLeft > 0 && (
+            {!isPlaying && (timeLeft > 0 || game.id === 'iq') && (
               <div className="relative z-10 text-center">
-                {['1', '2', '7', '8'].includes(game.id) || game.isAI ? (
+                {['1', '2', '7', '8', 'iq'].includes(game.id) || game.isAI ? (
                   <>
                     <button
                       onClick={startGame}
@@ -501,7 +513,8 @@ export default function App() {
                       {game.id === '2' && "Finde alle Paare!"}
                       {game.id === '7' && "Löse die Rechenaufgaben!"}
                       {game.id === '8' && "Klicke, sobald es grün wird!"}
-                      {game.isAI && !['1','2','7','8'].includes(game.id) && "Fange die fallenden Objekte!"}
+                      {game.id === 'iq' && "Beantworte die Logikfragen!"}
+                      {game.isAI && !['1','2','7','8','iq'].includes(game.id) && "Fange die fallenden Objekte!"}
                     </p>
                   </>
                 ) : (
@@ -521,7 +534,9 @@ export default function App() {
             {isPlaying && (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <div className="absolute top-4 left-4 text-2xl font-black text-play-blue">SCORE: {score}</div>
-                <div className="absolute top-4 right-4 text-2xl font-black text-play-pink">TIME: {timeLeft}s</div>
+                {game.id !== 'iq' && (
+                  <div className="absolute top-4 right-4 text-2xl font-black text-play-pink">TIME: {timeLeft}s</div>
+                )}
                 
                 {game.id === '1' && (
                   <motion.div
@@ -611,13 +626,74 @@ export default function App() {
                     </div>
                   </div>
                 )}
+                {game.id === 'iq' && (
+                  <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 text-center relative z-10 overflow-y-auto">
+                    <div className="mb-4 sm:mb-8 p-6 sm:p-8 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-md shadow-2xl max-w-3xl w-full relative overflow-hidden group mt-4">
+                      <div className="absolute -inset-10 bg-play-blue/20 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000 z-0"></div>
+                      
+                      <h3 className="text-xl sm:text-2xl lg:text-3xl font-black mb-2 text-white relative z-10 leading-relaxed">
+                        {currentIqQuestions[iqQuestionIdx]?.q}
+                      </h3>
+                      
+                      <div className="mt-4 text-play-blue font-mono text-sm font-bold relative z-10">
+                        FRAGE {iqQuestionIdx + 1} VON {currentIqQuestions.length}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-3xl pb-10">
+                      {currentIqQuestions[iqQuestionIdx]?.options.map((opt, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            if (opt === currentIqQuestions[iqQuestionIdx].a) {
+                              setScore(prev => prev + 200);
+                            }
+                            if (iqQuestionIdx < currentIqQuestions.length - 1) {
+                              setIqQuestionIdx(prev => prev + 1);
+                            } else {
+                              setTimeLeft(0);
+                              setIsPlaying(false);
+                            }
+                          }}
+                          className="group relative p-4 sm:p-6 bg-white/5 hover:bg-play-blue/10 border border-white/5 hover:border-play-blue/50 rounded-2xl font-bold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] flex items-center justify-center overflow-hidden min-h-[80px]"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-play-blue/0 via-play-blue/10 to-play-blue/0 opacity-0 group-hover:opacity-100 translate-x-[-100%] group-hover:translate-x-[100%] transition-all duration-1000"></div>
+                          <span className="text-base sm:text-lg text-white/80 group-hover:text-white transition-colors relative z-10 px-8">
+                            {opt}
+                          </span>
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/5 font-black text-4xl group-hover:text-play-blue/20 transition-colors">
+                            {i + 1}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {timeLeft === 0 && (
               <div className="relative z-10 text-center">
-                <h3 className="text-5xl font-black mb-4 text-blitz-yellow glow-yellow">GAME OVER!</h3>
-                <div className="text-3xl font-bold mb-8">Dein Score: <span className="text-play-blue">{score}</span></div>
+                <h3 className={`text-5xl font-black mb-4 ${game.id === 'iq' ? 'text-play-blue glow-blue' : 'text-blitz-yellow glow-yellow'}`}>
+                  {game.id === 'iq' ? 'TEST BEENDET!' : 'GAME OVER!'}
+                </h3>
+                
+                {game.id === 'iq' ? (
+                  <div className="mb-8">
+                    <p className="text-xl text-white/70 mb-2">Dein geschätzter IQ-Wert</p>
+                    <div className="text-8xl font-black text-white glow-blue mb-2">
+                      {Math.floor(70 + (score / 200) * 9)}
+                    </div>
+                    <p className="text-sm text-white/50">
+                      Du hast {score / 200} von {currentIqQuestions.length} Fragen richtig beantwortet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-3xl font-bold mb-8">
+                    Dein Score: <span className="text-play-blue">{score}</span>
+                  </div>
+                )}
+                
                 <button 
                   onClick={startGame}
                   className="px-8 py-4 rounded-2xl font-bold transition-all hover:scale-105 active:scale-95"
@@ -812,18 +888,18 @@ export default function App() {
                   {t.games}
                 </h2>
                 
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="relative">
+                <div className="flex flex-col xl:flex-row gap-4 min-w-0 max-w-full">
+                  <div className="relative shrink-0 w-full sm:w-64">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" size={18} />
                     <input 
                       type="text" 
                       placeholder={t.search}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-12 pr-6 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-play-blue transition-colors w-full sm:w-64"
+                      className="pl-12 pr-6 h-12 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-play-blue transition-colors w-full"
                     />
                   </div>
-                  <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
+                  <div className="flex items-center gap-2 overflow-x-auto overflow-y-hidden custom-scrollbar pb-3 min-w-0 w-full">
                     {[
                       { id: 'all', label: t.all },
                       { id: 'speed', label: t.speed },
@@ -835,8 +911,10 @@ export default function App() {
                       <button
                         key={f.id}
                         onClick={() => setFilter(f.id)}
-                        className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
-                          filter === f.id ? 'bg-play-blue text-white box-glow-blue' : 'bg-white/5 text-white/60 hover:bg-white/10'
+                        className={`h-12 px-6 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 border flex shrink-0 items-center justify-center ${
+                          filter === f.id 
+                            ? 'bg-play-blue text-white border-play-blue box-glow-blue' 
+                            : 'bg-white/5 text-white/60 hover:bg-white/10 border-white/10 hover:text-white hover:border-white/20'
                         }`}
                       >
                         {f.label}
