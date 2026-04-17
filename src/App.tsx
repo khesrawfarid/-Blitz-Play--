@@ -641,11 +641,11 @@ export default function App() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-3xl pb-10">
-                      {currentIqQuestions[iqQuestionIdx]?.options.map((opt, i) => (
+                      {currentIqQuestions[iqQuestionIdx]?.options?.map((opt, i) => (
                         <button
                           key={i}
                           onClick={() => {
-                            if (opt === currentIqQuestions[iqQuestionIdx].a) {
+                            if (opt === currentIqQuestions[iqQuestionIdx]?.a) {
                               setScore(prev => prev + 200);
                             }
                             if (iqQuestionIdx < currentIqQuestions.length - 1) {
