@@ -199,7 +199,7 @@ export default function App() {
   const [customImage, setCustomImage] = useState<string | null>(null);
   const [useAiImage, setUseAiImage] = useState(true);
   const [isLangOpen, setIsLangOpen] = useState(false);
-  const [generationError, setGenerationError] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const [footerModal, setFooterModal] = useState<'privacy' | 'terms' | 'support' | 'api' | null>(null);
 
   const t = translations[lang];
@@ -232,7 +232,8 @@ export default function App() {
       });
       
       if (!resp.ok) {
-        throw new Error(`Server returned ${resp.status}`);
+        const errorData = await resp.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server returned ${resp.status}`);
       }
 
       const result = await resp.json();
@@ -254,10 +255,10 @@ export default function App() {
       setAiTitle('');
       setCustomImage(null);
       setPage('games');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating game:", error);
       setIsGenerating(false);
-      setGenerationError(true);
+      setGenerationError(error.message || "Failed to generate game");
     }
   };
 
@@ -1061,8 +1062,8 @@ export default function App() {
                 </button>
                 
                 {generationError && (
-                  <div className="mt-4 p-4 bg-red-500/20 border border-red-500/50 rounded-xl text-red-400 text-center font-bold">
-                    {t.generateError}
+                  <div className="mt-4 p-4 bg-red-500/20 border border-red-500/50 rounded-xl text-red-400 text-center font-bold break-words">
+                    {t.generateError}: {generationError}
                   </div>
                 )}
               </div>

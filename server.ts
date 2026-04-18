@@ -51,44 +51,52 @@ const QUESTION_BANK: Record<string, any[]> = {
     { q: "Welche Firma entwickelte 'The Witcher'?", options: ["Bethesda", "BioWare", "CD Projekt Red", "Ubisoft"], a: "CD Projekt Red" }
   ],
   'flags-europe': [
-    { q: "Zu welchem Land gehört diese Flagge: 🇩🇪?", options: ["Belgien", "Deutschland", "Österreich", "Schweiz"], a: "Deutschland" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇫🇷?", options: ["Niederlande", "Frankreich", "Russland", "Italien"], a: "Frankreich" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇮🇹?", options: ["Italien", "Irland", "Ungarn", "Spanien"], a: "Italien" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇪🇸?", options: ["Portugal", "Spanien", "Griechenland", "Rumänien"], a: "Spanien" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇬🇧?", options: ["USA", "Australien", "Großbritannien", "Neuseeland"], a: "Großbritannien" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇨🇭?", options: ["Schweiz", "Dänemark", "Schweden", "Norwegen"], a: "Schweiz" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇸🇪?", options: ["Finnland", "Schweden", "Ukraine", "Island"], a: "Schweden" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇬🇷?", options: ["Zypern", "Griechenland", "Kroatien", "Bulgarien"], a: "Griechenland" }
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/de.png", options: ["Belgien", "Deutschland", "Österreich", "Schweiz"], a: "Deutschland" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/fr.png", options: ["Niederlande", "Frankreich", "Russland", "Italien"], a: "Frankreich" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/it.png", options: ["Italien", "Irland", "Ungarn", "Spanien"], a: "Italien" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/es.png", options: ["Portugal", "Spanien", "Griechenland", "Rumänien"], a: "Spanien" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/gb.png", options: ["USA", "Australien", "Großbritannien", "Neuseeland"], a: "Großbritannien" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/ch.png", options: ["Schweiz", "Dänemark", "Schweden", "Norwegen"], a: "Schweiz" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/se.png", options: ["Finnland", "Schweden", "Ukraine", "Island"], a: "Schweden" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/gr.png", options: ["Zypern", "Griechenland", "Kroatien", "Bulgarien"], a: "Griechenland" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/nl.png", options: ["Niederlande", "Luxemburg", "Frankreich", "Belgien"], a: "Niederlande" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/pl.png", options: ["Polen", "Österreich", "Indonesien", "Monaco"], a: "Polen" }
   ],
   'flags-asia': [
-    { q: "Zu welchem Land gehört diese Flagge: 🇯🇵?", options: ["Südkorea", "China", "Japan", "Vietnam"], a: "Japan" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇨🇳?", options: ["Vietnam", "Türkei", "China", "Taiwan"], a: "China" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇮🇳?", options: ["Indien", "Pakistan", "Nepal", "Bangladesch"], a: "Indien" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇰🇷?", options: ["Japan", "Nordkorea", "Südkorea", "Laos"], a: "Südkorea" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇹🇭?", options: ["Thailand", "Indonesien", "Kambodscha", "Malaysia"], a: "Thailand" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇻🇳?", options: ["China", "Vietnam", "Philippinen", "Myanmar"], a: "Vietnam" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇮🇩?", options: ["Japan", "Indonesien", "Polen", "Oman"], a: "Indonesien" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇵🇭?", options: ["Tschechien", "Puerto Rico", "Philippinen", "Malaysia"], a: "Philippinen" }
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/jp.png", options: ["Südkorea", "China", "Japan", "Vietnam"], a: "Japan" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/cn.png", options: ["Vietnam", "Türkei", "China", "Taiwan"], a: "China" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/in.png", options: ["Indien", "Pakistan", "Nepal", "Bangladesch"], a: "Indien" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/kr.png", options: ["Japan", "Nordkorea", "Südkorea", "Laos"], a: "Südkorea" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/th.png", options: ["Thailand", "Indonesien", "Kambodscha", "Malaysia"], a: "Thailand" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/vn.png", options: ["China", "Vietnam", "Philippinen", "Myanmar"], a: "Vietnam" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/id.png", options: ["Japan", "Indonesien", "Polen", "Oman"], a: "Indonesien" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/ph.png", options: ["Tschechien", "Puerto Rico", "Philippinen", "Malaysia"], a: "Philippinen" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/tr.png", options: ["Türkei", "Tunesien", "Pakistan", "Aserbaidschan"], a: "Türkei" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/sa.png", options: ["Saudi-Arabien", "Irak", "Iran", "Ägypten"], a: "Saudi-Arabien" }
   ],
   'flags-americas': [
-    { q: "Zu welchem Land gehört diese Flagge: 🇺🇸?", options: ["Großbritannien", "Australien", "Kanada", "USA"], a: "USA" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇨🇦?", options: ["Kanada", "Peru", "Chile", "Schweiz"], a: "Kanada" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇧🇷?", options: ["Argentinien", "Brasilien", "Bolivien", "Ecuador"], a: "Brasilien" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇲🇽?", options: ["Ungarn", "Italien", "Mexiko", "Peru"], a: "Mexiko" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇦🇷?", options: ["Uruguay", "Honduras", "Argentinien", "Guatemala"], a: "Argentinien" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇨🇴?", options: ["Ecuador", "Kolumbien", "Venezuela", "Rumänien"], a: "Kolumbien" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇨🇱?", options: ["Texas", "Kuba", "Panama", "Chile"], a: "Chile" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇨🇺?", options: ["Kuba", "Puerto Rico", "Bahamas", "Jamaika"], a: "Kuba" }
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/us.png", options: ["Großbritannien", "Australien", "Kanada", "USA"], a: "USA" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/ca.png", options: ["Kanada", "Peru", "Chile", "Schweiz"], a: "Kanada" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/br.png", options: ["Argentinien", "Brasilien", "Bolivien", "Ecuador"], a: "Brasilien" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/mx.png", options: ["Ungarn", "Italien", "Mexiko", "Peru"], a: "Mexiko" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/ar.png", options: ["Uruguay", "Honduras", "Argentinien", "Guatemala"], a: "Argentinien" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/co.png", options: ["Ecuador", "Kolumbien", "Venezuela", "Rumänien"], a: "Kolumbien" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/cl.png", options: ["Texas", "Kuba", "Panama", "Chile"], a: "Chile" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/cu.png", options: ["Kuba", "Puerto Rico", "Bahamas", "Jamaika"], a: "Kuba" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/pe.png", options: ["Peru", "Kanada", "Österreich", "Mexiko"], a: "Peru" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/uy.png", options: ["Argentinien", "Uruguay", "Chile", "Paraguay"], a: "Uruguay" }
   ],
   'flags-africa': [
-    { q: "Zu welchem Land gehört diese Flagge: 🇿🇦?", options: ["Südafrika", "Kenia", "Nigeria", "Ghana"], a: "Südafrika" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇪🇬?", options: ["Syrien", "Ägypten", "Irak", "Jemen"], a: "Ägypten" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇳🇬?", options: ["Pakistan", "Nigeria", "Kamerun", "Senegal"], a: "Nigeria" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇰🇪?", options: ["Tansania", "Kenia", "Sambia", "Uganda"], a: "Kenia" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇲🇦?", options: ["Vietnam", "Türkei", "Marokko", "Tunesien"], a: "Marokko" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇬🇭?", options: ["Ghana", "Senegal", "Mali", "Togo"], a: "Ghana" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇨🇲?", options: ["Kamerun", "Simbabwe", "Angola", "Nigeria"], a: "Kamerun" },
-    { q: "Zu welchem Land gehört diese Flagge: 🇨🇮?", options: ["Irland", "Italien", "Elfenbeinküste", "Mali"], a: "Elfenbeinküste" }
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/za.png", options: ["Südafrika", "Kenia", "Nigeria", "Ghana"], a: "Südafrika" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/eg.png", options: ["Syrien", "Ägypten", "Irak", "Jemen"], a: "Ägypten" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/ng.png", options: ["Pakistan", "Nigeria", "Kamerun", "Senegal"], a: "Nigeria" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/ke.png", options: ["Tansania", "Kenia", "Sambia", "Uganda"], a: "Kenia" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/ma.png", options: ["Vietnam", "Türkei", "Marokko", "Tunesien"], a: "Marokko" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/gh.png", options: ["Ghana", "Senegal", "Mali", "Togo"], a: "Ghana" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/cm.png", options: ["Kamerun", "Simbabwe", "Angola", "Nigeria"], a: "Kamerun" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/ci.png", options: ["Irland", "Italien", "Elfenbeinküste", "Mali"], a: "Elfenbeinküste" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/sn.png", options: ["Kamerun", "Senegal", "Ghana", "Mali"], a: "Senegal" },
+    { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/dz.png", options: ["Pakistan", "Algerien", "Ägypten", "Tunesien"], a: "Algerien" }
   ]
 };
 
@@ -144,7 +152,18 @@ async function startServer() {
       const room = rooms.get(code);
       if (room && room.hostId === socket.id) {
         
-        let selectedQuestions = QUESTION_BANK[topic] || QUESTION_BANK['general'];
+        let selectedQuestions = [];
+        if (topic === 'flags-all') {
+          selectedQuestions = [
+            ...(QUESTION_BANK['flags-europe'] || []),
+            ...(QUESTION_BANK['flags-asia'] || []),
+            ...(QUESTION_BANK['flags-americas'] || []),
+            ...(QUESTION_BANK['flags-africa'] || [])
+          ];
+        } else {
+          selectedQuestions = QUESTION_BANK[topic] || QUESTION_BANK['general'];
+        }
+        
         // Shuffle and pick 5 questions max
         selectedQuestions = [...selectedQuestions].sort(() => 0.5 - Math.random()).slice(0, 5);
 
@@ -231,7 +250,7 @@ async function startServer() {
       
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+        model: "gemini-3-flash-preview",
         contents: `Create a simple, playable HTML5 game based on this prompt: "${prompt}". 
         The game should be fully contained in a single HTML string (including CSS and JS). 
         It should be responsive, use modern graphics (canvas or DOM), and be playable with mouse/touch or keyboard.
@@ -260,9 +279,9 @@ async function startServer() {
       const generatedData = JSON.parse(cleanedText);      
       
       res.json(generatedData);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      res.status(500).json({ error: "Failed to generate game" });
+      res.status(500).json({ error: error.message || "Failed to generate game" });
     }
   });
 

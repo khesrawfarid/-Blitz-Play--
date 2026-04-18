@@ -32,7 +32,7 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
 
   useEffect(() => {
     // Determine the socket URL. Since we are in the same environment (port 3000 serves both), we can connect relatively.
-    socket = io();
+    socket = io({ transports: ['websocket'] });
 
     socket.on('room-update', (r: Room) => {
       setRoom(r);
@@ -90,7 +90,7 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
   };
 
   const [selectedTopic, setSelectedTopic] = useState('general');
-  const [selectedSubTopic, setSelectedSubTopic] = useState('flags-europe');
+  const [selectedSubTopic, setSelectedSubTopic] = useState('flags-all');
 
   const TOPICS = [
     { id: 'general', name: 'Allgemein', img: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&q=80&w=200&h=200' },
@@ -233,6 +233,7 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
                       onChange={(e) => setSelectedSubTopic(e.target.value)}
                       className="bg-black/60 border border-white/10 text-white font-bold text-lg rounded-xl px-6 py-3 cursor-pointer outline-none focus:border-play-blue appearance-none text-center min-w-[250px]"
                     >
+                      <option value="flags-all">🌐 Weltweit (Alle Flaggen)</option>
                       <option value="flags-europe">🌍 Europa</option>
                       <option value="flags-asia">🌏 Asien</option>
                       <option value="flags-americas">🌎 Amerika</option>
@@ -263,10 +264,18 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
             </div>
           </div>
           
-          <div className="flex-1 flex items-center justify-center w-full px-4 mb-8">
+          <div className="flex-1 flex flex-col items-center justify-center w-full px-4 mb-8">
             <h3 className="text-3xl sm:text-5xl font-black text-white text-center leading-tight drop-shadow-2xl">
               {room.questions?.[room.currentQuestion]?.q || "Frage wird geladen..."}
             </h3>
+            {room.questions?.[room.currentQuestion]?.img && (
+              <img 
+                src={room.questions[room.currentQuestion].img} 
+                alt="Flagge" 
+                className="mt-6 w-64 h-auto rounded-lg shadow-[0_0_20px_rgba(255,255,255,0.2)] object-cover border border-white/10"
+                referrerPolicy="no-referrer"
+              />
+            )}
           </div>
 
           {!isHost || myPlayerInfo ? (
