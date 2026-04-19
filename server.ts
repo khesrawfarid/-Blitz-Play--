@@ -233,56 +233,12 @@ async function startServer() {
   });
 
   // API route for generation
-  app.post("/api/generate-game", async (req, res) => {
-    try {
-      const { prompt } = req.body;
-      
-      if (!prompt) {
-        res.status(400).json({ error: "Prompt is required" });
-        return;
-      }
-
-      if (!process.env.GEMINI_API_KEY) {
-        console.error("GEMINI_API_KEY is not set on the server.");
-        res.status(500).json({ error: "Server missing API key." });
-        return;
-      }
-      
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Create a simple, playable HTML5 game based on this prompt: "${prompt}". 
-        The game should be fully contained in a single HTML string (including CSS and JS). 
-        It should be responsive, use modern graphics (canvas or DOM), and be playable with mouse/touch or keyboard.
-        Also provide a short, descriptive prompt for an AI image generator to create a thumbnail for this game.`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              htmlCode: {
-                type: Type.STRING,
-                description: "The complete HTML code for the game, including <style> and <script> tags."
-              },
-              imagePrompt: {
-                type: Type.STRING,
-                description: "A prompt for an image generator to create a thumbnail for this game."
-              }
-            },
-            required: ["htmlCode", "imagePrompt"],
-          }
-        }
-      });
-      
-      const rawText = response.text || "{}";
-      const cleanedText = rawText.replace(/```json\n?|\n?```/g, "").trim();
-      const generatedData = JSON.parse(cleanedText);      
-      
-      res.json(generatedData);
-    } catch (error: any) {
-      console.error(error);
-      res.status(500).json({ error: error.message || "Failed to generate game" });
-    }
+  app.get("/api/debug-key", (req, res) => {
+    res.json({
+      gemini: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.substring(0, 5) : "none",
+      google: process.env.GOOGLE_API_KEY ? process.env.GOOGLE_API_KEY.substring(0, 5) : "none",
+      api: process.env.API_KEY ? process.env.API_KEY.substring(0, 5) : "none",
+    });
   });
 
   // Vite middleware for development
