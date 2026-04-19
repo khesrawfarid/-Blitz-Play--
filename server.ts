@@ -297,6 +297,8 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
+    // Ensure assets are always served, even if the user's browser URL has a leftover base path like /BlitzPlayGame/
+    app.use('/assets', express.static(path.join(distPath, 'assets')));
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
