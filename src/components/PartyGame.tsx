@@ -21,7 +21,7 @@ interface Room {
   questions: any[];
 }
 
-export default function PartyGame({ onExit }: { onExit: () => void }) {
+export default function PartyGame({ onExit, t }: { onExit: () => void, t: any }) {
   const [room, setRoom] = useState<Room | null>(null);
   const [name, setName] = useState('');
   const [joinCode, setJoinCode] = useState('');
@@ -43,7 +43,7 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
     });
 
     socket.on('party-closed', () => {
-      alert('Die Party wurde vom Host beendet.');
+      alert(t.partyClosed);
       onExit();
     });
 
@@ -52,12 +52,12 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
         socket.disconnect();
       }
     };
-  }, []);
+  }, [t]);
 
   // Timer logic for questions
   useEffect(() => {
     if (room?.state === 'playing' && timeLeft > 0) {
-      const timer = setTimeout(() => setTimeLeft(t => t - 1), 1000);
+      const timer = setTimeout(() => setTimeLeft(prev => prev - 1), 1000);
       return () => clearTimeout(timer);
     } else if (room?.state === 'playing' && timeLeft === 0 && !selectedAnswer && !isHost) {
        // time's up, auto-submit empty or wrong
@@ -88,10 +88,10 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
   const handleJoinParty = () => {
     let playerName = name.trim();
     if (!playerName) {
-      playerName = 'Spieler' + Math.floor(Math.random()*1000);
+      playerName = 'Player' + Math.floor(Math.random()*1000);
       setName(playerName);
     }
-    if (!joinCode) return setError('Bitte gib einen Party Code ein!');
+    if (!joinCode) return setError('Error: No Code');
     socket?.emit('join-party', { code: joinCode.toUpperCase(), name: playerName }, (res: any) => {
       if (res.error) setError(res.error);
     });
@@ -140,7 +140,7 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
           
           <input 
             type="text" 
-            placeholder="Party Code (zum Beitreten)" 
+            placeholder="Code" 
             value={joinCode}
             onChange={e => setJoinCode(e.target.value.toUpperCase())}
             maxLength={4}
@@ -151,16 +151,16 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
             onClick={handleJoinParty}
             className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition-colors mt-2"
           >
-            Party beitreten
+            {t.joinParty}
           </button>
 
-          <div className="text-center text-white/30 text-sm my-2">ODER</div>
+          <div className="text-center text-white/30 text-sm my-2">{t.or}</div>
 
           <button 
             onClick={handleCreateParty}
             className="w-full bg-play-blue text-black font-black py-4 rounded-xl hover:scale-105 transition-transform"
           >
-            Neue Party hosten
+            {t.hostParty}
           </button>
         </div>
       </div>
@@ -174,12 +174,12 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
       {/* Header */}
       <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl border border-white/10 mb-8 backdrop-blur-md">
         <div className="flex items-center gap-4">
-          <div className="text-sm text-white/50">Party Code:</div>
+          <div className="text-sm text-white/50">{t.partyCode}</div>
           <div className="text-3xl font-mono font-black text-blitz-yellow tracking-widest">{room.code}</div>
         </div>
         <div className="text-white/80 font-bold flex gap-4 items-center">
           <Users size={20} className="text-play-blue"/> 
-          {room.players.length} Spieler
+          {room.players.length} {t.players}
           <button onClick={onExit} className="ml-4 p-2 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors">
             <LogOut size={18} />
           </button>
@@ -188,7 +188,7 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
 
       {room.state === 'lobby' && (
         <div className="flex-1 flex flex-col items-center justify-center">
-          <h2 className="text-3xl font-bold text-white mb-8">Warten auf Spieler...</h2>
+          <h2 className="text-3xl font-bold text-white mb-8">{t.waitPlayers}</h2>
           <div className="flex flex-wrap gap-4 justify-center max-w-2xl">
             <AnimatePresence>
               {room.players.map(p => (
@@ -200,7 +200,7 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
                 >
                   {p.id === room.hostId && <Trophy size={16} className="text-blitz-yellow" />}
                   {p.name}
-                  {p.id === socket?.id && <span className="text-xs text-white/40 ml-2">(Du)</span>}
+                  {p.id === socket?.id && <span className="text-xs text-white/40 ml-2">({t.you})</span>}
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -209,22 +209,22 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
           {isHost && (
             <div className="mt-12 flex flex-col items-center gap-6 w-full max-w-3xl">
               <div className="flex flex-col items-center gap-4 w-full">
-                <label className="text-white/60 font-bold text-sm uppercase tracking-wider">Thema wählen</label>
+                <label className="text-white/60 font-bold text-sm uppercase tracking-wider">{t.chooseTopic}</label>
                 <div className="flex flex-row justify-center gap-4 flex-wrap">
-                  {TOPICS.map(t => (
+                  {TOPICS.map(topic => (
                     <button
-                      key={t.id}
-                      onClick={() => setSelectedTopic(t.id)}
+                      key={topic.id}
+                      onClick={() => setSelectedTopic(topic.id)}
                       className={`relative overflow-hidden rounded-2xl border-4 transition-all duration-300 w-32 h-32 group hover:scale-105 ${
-                        selectedTopic === t.id ? 'border-play-blue shadow-[0_0_20px_rgba(59,130,246,0.5)]' : 'border-transparent opacity-60 hover:opacity-100'
+                        selectedTopic === topic.id ? 'border-play-blue shadow-[0_0_20px_rgba(59,130,246,0.5)]' : 'border-transparent opacity-60 hover:opacity-100'
                       }`}
                     >
-                      <img src={t.img} alt={t.name} referrerPolicy="no-referrer" className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                      <img src={topic.img} alt={topic.name} referrerPolicy="no-referrer" className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
                       <span className="absolute bottom-3 left-0 w-full text-center font-black text-white text-sm drop-shadow-md px-1">
-                        {t.name}
+                        {topic.name}
                       </span>
-                      {selectedTopic === t.id && (
+                      {selectedTopic === topic.id && (
                         <div className="absolute top-2 right-2 text-play-blue drop-shadow-md bg-white rounded-full">
                           <CheckCircle2 size={24} fill="currentColor" className="text-black" />
                         </div>
@@ -235,17 +235,17 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
 
                 {selectedTopic === 'flags' && (
                   <div className="mt-6 flex flex-col items-center gap-2 animate-in fade-in zoom-in duration-300">
-                    <label className="text-white/60 font-bold text-sm uppercase tracking-wider">Welcher Kontinent?</label>
+                    <label className="text-white/60 font-bold text-sm uppercase tracking-wider">{t.continent}</label>
                     <select
                       value={selectedSubTopic}
                       onChange={(e) => setSelectedSubTopic(e.target.value)}
                       className="bg-black/60 border border-white/10 text-white font-bold text-lg rounded-xl px-6 py-3 cursor-pointer outline-none focus:border-play-blue appearance-none text-center min-w-[250px]"
                     >
-                      <option value="flags-all">🌐 Weltweit (Alle Flaggen)</option>
-                      <option value="flags-europe">🌍 Europa</option>
-                      <option value="flags-asia">🌏 Asien</option>
-                      <option value="flags-americas">🌎 Amerika</option>
-                      <option value="flags-africa">🌍 Afrika</option>
+                      <option value="flags-all">🌐 {t.worldwide}</option>
+                      <option value="flags-europe">🌍 {t.europe}</option>
+                      <option value="flags-asia">🌏 {t.asia}</option>
+                      <option value="flags-americas">🌎 {t.americas}</option>
+                      <option value="flags-africa">🌍 {t.africa}</option>
                     </select>
                   </div>
                 )}
@@ -256,7 +256,7 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
                 disabled={room.players.length < 1}
                 className="mt-6 px-12 py-4 bg-play-blue text-black font-black text-xl rounded-2xl hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-3 shadow-[0_0_30px_rgba(33,245,188,0.5)]"
               >
-                <Play fill="currentColor" /> Spiel Starten
+                <Play fill="currentColor" /> {t.startParty}
               </button>
             </div>
           )}
@@ -266,7 +266,7 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
       {room.state === 'playing' && (
         <div className="flex-1 flex flex-col items-center justify-between">
           <div className="w-full flex justify-between items-center mb-4 px-4">
-            <div className="text-play-blue font-mono font-bold">Frage {room.currentQuestion + 1} / {room.questions.length}</div>
+            <div className="text-play-blue font-mono font-bold">{t.question} {room.currentQuestion + 1} / {room.questions.length}</div>
             <div className="text-2xl font-black text-blitz-yellow flex items-center gap-2">
               <Clock size={24} /> {timeLeft}s
             </div>
@@ -274,12 +274,12 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
           
           <div className="flex-1 flex flex-col items-center justify-center w-full px-4 mb-8">
             <h3 className="text-3xl sm:text-5xl font-black text-white text-center leading-tight drop-shadow-2xl">
-              {room.questions?.[room.currentQuestion]?.q || "Frage wird geladen..."}
+              {room.questions?.[room.currentQuestion]?.q || "..." }
             </h3>
             {room.questions?.[room.currentQuestion]?.img && (
               <img 
                 src={room.questions[room.currentQuestion].img} 
-                alt="Flagge" 
+                alt="Image" 
                 className="mt-6 w-64 h-auto rounded-lg shadow-[0_0_20px_rgba(255,255,255,0.2)] object-cover border border-white/10"
                 referrerPolicy="no-referrer"
               />
@@ -308,18 +308,18 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
               })}
             </div>
           ) : (
-            <div className="text-white/50 text-xl pb-16">Du bist Host. Schau auf die Ergebnisse!</div>
+            <div className="text-white/50 text-xl pb-16"></div>
           )}
           
           {selectedAnswer && (
-             <div className="text-play-blue font-bold animate-pulse pb-4">Warte auf andere Spieler...</div>
+             <div className="text-play-blue font-bold animate-pulse pb-4">{t.waitPlayers}</div>
           )}
         </div>
       )}
 
       {room.state === 'leaderboard' && (
         <div className="flex-1 flex flex-col items-center justify-center max-w-2xl mx-auto w-full">
-          <h2 className="text-4xl font-black text-white mb-8 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">Zwischenstand</h2>
+          <h2 className="text-4xl font-black text-white mb-8 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">{t.leaderboard}</h2>
           
           <div className="w-full bg-white/5 backdrop-blur-md rounded-3xl p-2 border border-white/10 mb-8">
             {room.players.sort((a,b) => b.score - a.score).map((p, i) => (
@@ -329,7 +329,7 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
                     #{i+1}
                   </span>
                   <span className="text-xl font-bold text-white flex items-center gap-2">
-                    {p.name} {p.id === socket?.id && '(Du)'}
+                    {p.name} {p.id === socket?.id && `(${t.you})`}
                     {i === 0 && <Trophy className="text-blitz-yellow" size={20} />}
                   </span>
                 </div>
@@ -338,14 +338,14 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
             ))}
           </div>
 
-          <div className="text-play-blue animate-pulse font-bold text-xl">Nächste Frage in Kürze...</div>
+          <div className="text-play-blue animate-pulse font-bold text-xl">{t.waitNextRound}</div>
         </div>
       )}
 
       {room.state === 'finished' && (
         <div className="flex-1 flex flex-col items-center justify-center max-w-2xl mx-auto w-full">
           <Trophy className="w-32 h-32 text-blitz-yellow mb-6 drop-shadow-[0_0_30px_rgba(247,214,48,0.5)]" />
-          <h2 className="text-5xl font-black text-white mb-8">Endergebnis</h2>
+          <h2 className="text-5xl font-black text-white mb-8">{t.endResults}</h2>
           
           <div className="w-full bg-white/5 backdrop-blur-md rounded-3xl p-6 border border-white/10 mb-8 text-center space-y-4">
             {room.players.sort((a,b) => b.score - a.score).slice(0,3).map((p, i) => (
@@ -363,7 +363,7 @@ export default function PartyGame({ onExit }: { onExit: () => void }) {
              onClick={onExit}
              className="px-8 py-4 bg-play-blue text-black font-black rounded-xl"
           >
-             Zurück zur Lobby
+             {t.backToHome}
           </button>
         </div>
       )}

@@ -422,8 +422,13 @@ export default function App() {
 
     const handleReactionClick = () => {
       if (reactionState === 'waiting') {
-        setReactionState('idle');
-        alert("Zu früh! Warte auf GRÜN.");
+        setReactionState('idle'); // Pause timer
+        alert(t.tooEarly);
+        setTimeout(() => {
+          if (document.visibilityState === 'visible') { // basic check
+            setReactionState('waiting');
+          }
+        }, 100);
       } else if (reactionState === 'ready') {
         const time = Date.now() - reactionStartTime;
         setReactionTime(time);
@@ -434,7 +439,7 @@ export default function App() {
 
     const startGame = () => {
       setScore(0);
-      setTimeLeft(game.id === '2' ? 60 : ['iq', 'party'].includes(game.id) ? -1 : 15);
+      setTimeLeft(game.id === '2' ? 60 : ['iq', 'party', '8'].includes(game.id) ? -1 : 15);
       setIsPlaying(true);
       if (game.id === '1') spawnTarget();
       if (game.id === '2') initMemory();
@@ -503,7 +508,7 @@ export default function App() {
               />
             </div>
             
-            {!isPlaying && (timeLeft > 0 || ['iq', 'party'].includes(game.id)) && (
+            {!isPlaying && (timeLeft > 0 || ['iq', 'party', '8'].includes(game.id)) && (
               <div className="relative z-10 text-center">
                 {['1', '2', '7', '8', 'iq', 'party'].includes(game.id) || game.isAI ? (
                   <>
@@ -540,7 +545,7 @@ export default function App() {
 
             {isPlaying && (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                {game.id !== 'party' && (
+                {game.id !== 'party' && game.id !== '8' && (
                   <>
                     <div className="absolute top-4 left-4 text-2xl font-black text-play-blue">SCORE: {score}</div>
                     {game.id !== 'iq' && (
@@ -620,17 +625,17 @@ export default function App() {
                     }`}
                   >
                     <div className="text-center pointer-events-none">
-                      {reactionState === 'waiting' && <h3 className="text-4xl font-black">Warte auf GRÜN...</h3>}
-                      {reactionState === 'ready' && <h3 className="text-6xl font-black text-black">KLICK JETZT!</h3>}
+                      {reactionState === 'waiting' && <h3 className="text-4xl font-black">{t.waitGreen}</h3>}
+                      {reactionState === 'ready' && <h3 className="text-6xl font-black text-black">{t.clickNow}</h3>}
                       {reactionState === 'result' && (
                         <div>
-                          <h3 className="text-4xl font-black mb-4">Reaktionszeit:</h3>
-                          <div className="text-7xl font-black text-play-blue">{reactionTime}ms</div>
+                          <h3 className="text-4xl font-black mb-4">{t.reactionTime}</h3>
+                          <div className="text-7xl font-black text-play-blue drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]">{reactionTime} ms</div>
                           <button 
                             onClick={(e) => { e.stopPropagation(); startGame(); }}
-                            className="mt-8 px-8 py-4 bg-white/10 hover:bg-white/20 rounded-2xl font-bold"
+                            className="mt-8 px-10 py-5 bg-play-blue text-black font-black text-xl hover:scale-105 rounded-2xl transition-transform shadow-[0_0_20px_rgba(59,130,246,0.3)] pointer-events-auto"
                           >
-                            Nochmal
+                            {t.tryAgain}
                           </button>
                         </div>
                       )}
@@ -638,7 +643,7 @@ export default function App() {
                   </div>
                 )}
                 {game.id === 'party' && (
-                  <PartyGame onExit={() => { setScore(0); setIsPlaying(false); onClose(); }} />
+                  <PartyGame onExit={() => { setScore(0); setIsPlaying(false); onClose(); }} t={t} />
                 )}
 
                 {game.id === 'iq' && (
@@ -681,25 +686,25 @@ export default function App() {
               </div>
             )}
 
-            {timeLeft === 0 && !['party'].includes(game.id) && (
+            {timeLeft === 0 && !['party', '8'].includes(game.id) && (
               <div className="relative z-10 text-center">
                 <h3 className={`text-5xl font-black mb-4 ${game.id === 'iq' ? 'text-play-blue glow-blue' : 'text-blitz-yellow glow-yellow'}`}>
-                  {game.id === 'iq' ? 'TEST BEENDET!' : 'GAME OVER!'}
+                  {game.id === 'iq' ? t.testEnded : t.gameOver}
                 </h3>
                 
                 {game.id === 'iq' ? (
                   <div className="mb-8">
-                    <p className="text-xl text-white/70 mb-2">Dein geschätzter IQ-Wert</p>
+                    <p className="text-xl text-white/70 mb-2">{t.estimatedIQ}</p>
                     <div className="text-8xl font-black text-white glow-blue mb-2">
                       {Math.floor(70 + (score / 200) * 9)}
                     </div>
                     <p className="text-sm text-white/50">
-                      Du hast {score / 200} von {currentIqQuestions.length} Fragen richtig beantwortet.
+                      {t.questionsAnswered} {score / 200} {t.outOf} {currentIqQuestions.length} {t.questionsAnswered2}
                     </p>
                   </div>
                 ) : (
                   <div className="text-3xl font-bold mb-8">
-                    Dein Score: <span className="text-play-blue">{score}</span>
+                    {t.yourScore} <span className="text-play-blue">{score}</span>
                   </div>
                 )}
                 
@@ -708,7 +713,7 @@ export default function App() {
                   className="px-8 py-4 rounded-2xl font-bold transition-all hover:scale-105 active:scale-95"
                   style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
                 >
-                  Nochmal versuchen
+                  {t.tryAgain}
                 </button>
               </div>
             )}
@@ -1071,15 +1076,15 @@ export default function App() {
               <div className="mt-12 grid grid-cols-2 gap-6">
                 <div className="p-6 bg-white/5 rounded-2xl border border-white/5">
                   <h4 className="font-bold mb-2 flex items-center gap-2 text-play-blue">
-                    <Users size={16} /> Multiplayer Mode
+                    <Users size={16} /> {t.multiplayerMode}
                   </h4>
-                  <p className="text-xs text-white/40">Erstelle Spiele, die du direkt mit Freunden im 1v1 Duell spielen kannst.</p>
+                  <p className="text-xs text-white/40">{t.multiplayerDesc}</p>
                 </div>
                 <div className="p-6 bg-white/5 rounded-2xl border border-white/5">
                   <h4 className="font-bold mb-2 flex items-center gap-2 text-blitz-yellow">
-                    <Flame size={16} /> Blitz Mode
+                    <Flame size={16} /> {t.blitzMode}
                   </h4>
-                  <p className="text-xs text-white/40">Füge automatische Geschwindigkeitssteigerung für extra Nervenkitzel hinzu.</p>
+                  <p className="text-xs text-white/40">{t.blitzModeDesc}</p>
                 </div>
               </div>
             </motion.div>
@@ -1122,12 +1127,41 @@ export default function App() {
                     {footerModal === 'api' ? 'API Documentation' : footerModal}
                   </h2>
                   <div className="text-white/60 space-y-4">
-                    <p>
-                      {footerModal === 'privacy' && 'Hier findest du in Kürze alle Informationen zum Datenschutz. Wir verarbeiten deine Daten nur für die Bereitstellung des besten Spielerlebnisses.'}
-                      {footerModal === 'terms' && 'Unsere Nutzungsbedingungen werden aktuell überarbeitet. Es gilt: Spiel fair, hab Spaß und cheate nicht!'}
-                      {footerModal === 'support' && 'Brauchst du Hilfe? Unser Support-Team kümmert sich bald um all deine Anliegen. Feature Request? Bug gefunden? Sag uns Bescheid!'}
-                      {footerModal === 'api' && 'Die BlitzPlay Developer API befindet sich in der geschlossenen Beta. Bald kannst du deine eigenen Dienste anbinden!'}
-                    </p>
+                    <div className="text-white/60 space-y-4 text-sm max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                      {footerModal === 'privacy' && (
+                        <>
+                          <h3 className="text-white font-bold mb-2">{t.privacyTitle}</h3>
+                          <p>{t.privacy1}</p>
+                          <h4 className="text-white font-bold mt-4 mb-2">{t.privacy2}</h4>
+                          <p>{t.privacy3}</p>
+                          <p className="mt-2">{t.privacy4}</p>
+                          <h4 className="text-white font-bold mt-4 mb-2">{t.privacy5}</h4>
+                          <p>{t.privacy6}</p>
+                          <p className="mt-2">{t.privacy7}</p>
+                        </>
+                      )}
+                      {footerModal === 'terms' && (
+                        <>
+                          <h3 className="text-white font-bold mb-2">{t.termsTitle}</h3>
+                          <p>{t.terms1}</p>
+                          
+                          <h4 className="text-white font-bold mt-4 mb-2">{t.terms2}</h4>
+                          <p>{t.terms3}</p>
+                          <p>{t.terms4.split('\n').map((line: string, i: number) => <React.Fragment key={i}>{line}<br/></React.Fragment>)}</p>
+                          <p>{t.terms5.split('\n').map((line: string, i: number) => <React.Fragment key={i}>{line}<br/></React.Fragment>)}</p>
+
+                          <h4 className="text-white font-bold mt-4 mb-2">{t.terms6}</h4>
+                          <p>{t.terms7}</p>
+                          <ul className="list-disc pl-5 mt-2 space-y-1">
+                            <li>{t.terms8}</li>
+                            <li>{t.terms9}</li>
+                            <li>{t.terms10}</li>
+                          </ul>
+                        </>
+                      )}
+                      {footerModal === 'support' && <p>{t.supportText}</p>}
+                      {footerModal === 'api' && <p>{t.apiText}</p>}
+                    </div>
                     <button 
                       onClick={() => {
                         setFooterModal(null);
@@ -1137,7 +1171,7 @@ export default function App() {
                       className="mt-8 font-bold bg-play-blue/10 text-play-blue border border-play-blue/20 hover:bg-play-blue hover:text-black px-6 py-4 rounded-xl transition-all flex items-center gap-3 w-full justify-center group"
                     >
                       <Home size={18} className="group-hover:scale-110 transition-transform" /> 
-                      Zurück zur Startseite
+                      {t.backToHome}
                     </button>
                   </div>
                 </div>
@@ -1151,13 +1185,13 @@ export default function App() {
       <footer className="border-t border-white/5 py-12 px-4">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
           <Logo size="sm" />
-          <div className="flex gap-8 text-white/40 text-sm font-bold uppercase tracking-widest">
-            <button onClick={() => setFooterModal('privacy')} className="hover:text-white transition-colors">Privacy</button>
-            <button onClick={() => setFooterModal('terms')} className="hover:text-white transition-colors">Terms</button>
-            <button onClick={() => setFooterModal('support')} className="hover:text-white transition-colors">Support</button>
-            <button onClick={() => setFooterModal('api')} className="hover:text-white transition-colors">API</button>
+          <div className="flex flex-wrap justify-center md:justify-end gap-x-8 gap-y-4 text-white/40 text-sm font-bold uppercase tracking-widest">
+            <button onClick={() => setFooterModal('privacy')} className="hover:text-white transition-colors">{t.privacy}</button>
+            <button onClick={() => setFooterModal('terms')} className="hover:text-white transition-colors">{t.terms}</button>
+            <button onClick={() => setFooterModal('support')} className="hover:text-white transition-colors">{t.support}</button>
+            <button onClick={() => setFooterModal('api')} className="hover:text-white transition-colors">{t.api}</button>
           </div>
-          <p className="text-white/20 text-xs">© 2026 BlitzPlay. All rights reserved.</p>
+          <p className="text-white/20 text-xs text-center md:text-left mt-4 md:mt-0">© 2026 BlitzPlay. All rights reserved.</p>
         </div>
       </footer>
     </div>
