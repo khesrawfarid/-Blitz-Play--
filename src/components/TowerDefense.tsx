@@ -36,9 +36,28 @@ interface Projectile {
   targetId: number;
   speed: number;
   damage: number;
+  color: string;
 }
 
-// Basic path config
+type TowerType = 'basic' | 'rapid' | 'sniper';
+
+const TOWER_CONFIGS: Record<TowerType, { cost: number, range: number, damage: number, fireRate: number, color: string, label: string }> = {
+  basic: { cost: 50, range: 3.5, damage: 15, fireRate: 800, color: '#3b82f6', label: 'Basic' },
+  rapid: { cost: 120, range: 2.5, damage: 8, fireRate: 200, color: '#ef4444', label: 'Rapid' },
+  sniper: { cost: 150, range: 8, damage: 80, fireRate: 2000, color: '#eab308', label: 'Sniper' },
+};
+
+interface Tower {
+  id: number;
+  x: number;
+  y: number;
+  type: TowerType;
+  range: number;
+  damage: number;
+  fireRate: number; // shots per ms
+  lastFired: number;
+  cost: number;
+}
 const PATH = [
   { x: 0, y: 3 },
   { x: 5, y: 3 },
@@ -63,6 +82,7 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
   const [wave, setWave] = useState(1);
   const [score, setScore] = useState(0);
   const [showGrid, setShowGrid] = useState(false);
+  const [selectedTowerType, setSelectedTowerType] = useState<TowerType>('basic');
   
   // Ref for mutable state that drives the loop without causing full re-renders
   const stateRef = useRef({
@@ -161,13 +181,14 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
     } else {
       if (state.enemiesToSpawn > 0) {
         if (time - state.spawnTimer > 1000) {
+          const waveMultiplier = Math.pow(1.35, state.wave - 1);
           state.enemies.push({
             id: nextEnemyId.current++,
             x: PATH[0].x,
             y: PATH[0].y,
-            hp: 20 * Math.pow(1.2, state.wave - 1),
-            maxHp: 20 * Math.pow(1.2, state.wave - 1),
-            speed: 1.5 + (state.wave * 0.1), // grid units per second
+            hp: 20 * waveMultiplier,
+            maxHp: 20 * waveMultiplier,
+            speed: Math.min(5, 1.5 + (state.wave * 0.15)), // grid units per second
             pathIndex: 0,
             reward: 5 + Math.floor(state.wave * 0.5)
           });
@@ -230,7 +251,8 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
             y: tower.y,
             targetId: target.id,
             speed: 10,
-            damage: tower.damage
+            damage: tower.damage,
+            color: TOWER_CONFIGS[tower.type].color
           });
           tower.lastFired = time;
         }
@@ -322,13 +344,18 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
 
     // Draw Towers
     stateRef.current.towers.forEach(tower => {
-      ctx.fillStyle = '#facc15';
+      const conf = TOWER_CONFIGS[tower.type];
+      ctx.fillStyle = conf.color;
       ctx.fillRect(tower.x * GRID_SIZE + 4, tower.y * GRID_SIZE + 4, GRID_SIZE - 8, GRID_SIZE - 8);
       // Range indicator
-      ctx.strokeStyle = 'rgba(250, 204, 21, 0.2)';
+      ctx.strokeStyle = conf.color.replace(')', ', 0.2)').replace('rgb', 'rgba'); // Fallback hack if using rgb/rgba; but we have hex colors.
+      // Better to just set globalAlpha:
+      ctx.globalAlpha = 0.2;
+      ctx.strokeStyle = conf.color;
       ctx.beginPath();
       ctx.arc(tower.x * GRID_SIZE + GRID_SIZE/2, tower.y * GRID_SIZE + GRID_SIZE/2, tower.range * GRID_SIZE, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.globalAlpha = 1.0;
     });
 
     // Draw Enemies
@@ -351,8 +378,8 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
     });
 
     // Draw Projectiles
-    ctx.fillStyle = '#3b82f6'; // Blue bullet
     stateRef.current.projectiles.forEach(proj => {
+      ctx.fillStyle = proj.color;
       ctx.beginPath();
       ctx.arc(proj.x * GRID_SIZE + GRID_SIZE/2, proj.y * GRID_SIZE + GRID_SIZE/2, 4, 0, Math.PI * 2);
       ctx.fill();
@@ -392,7 +419,8 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
     const gridY = Math.floor(y / GRID_SIZE);
 
     // Try to place tower
-    const towerCost = 50;
+    const towerConfig = TOWER_CONFIGS[selectedTowerType];
+    const towerCost = towerConfig.cost;
     if (stateRef.current.money >= towerCost && !isPathOrTower(gridX, gridY)) {
       stateRef.current.money -= towerCost;
       setMoney(stateRef.current.money);
@@ -400,9 +428,10 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
         id: nextTowerId.current++,
         x: gridX,
         y: gridY,
-        range: 3.5,
-        damage: 15,
-        fireRate: 800,
+        type: selectedTowerType,
+        range: towerConfig.range,
+        damage: towerConfig.damage,
+        fireRate: towerConfig.fireRate,
         lastFired: 0,
         cost: towerCost
       });
@@ -436,6 +465,26 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
         </div>
       </div>
       
+      {gameState === 'playing' && (
+        <div className="flex w-full max-w-4xl justify-center gap-4 bg-black/40 p-2 border-x border-white/10 backdrop-blur-md">
+          {(Object.keys(TOWER_CONFIGS) as TowerType[]).map(type => {
+            const conf = TOWER_CONFIGS[type];
+            const isSelected = selectedTowerType === type;
+            return (
+              <button
+                key={type}
+                onClick={() => setSelectedTowerType(type)}
+                className={`px-6 py-2 rounded-xl border-2 transition-all flex flex-col items-center gap-1 hover:border-white/50 ${isSelected ? 'bg-white/10' : 'bg-transparent'}`}
+                style={{ borderColor: isSelected ? conf.color : 'rgba(255,255,255,0.1)' }}
+              >
+                <div className="font-bold tracking-wider" style={{ color: conf.color }}>{conf.label}</div>
+                <div className="text-white/70 text-sm">{conf.cost}$ | DMG: {conf.damage}</div>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       <div className="relative border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-b-2xl overflow-hidden group">
         {/* Background Image */}
         <div 
@@ -448,7 +497,7 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
           height={CANVAS_HEIGHT}
           onClick={handleCanvasClick}
           className="w-full max-w-4xl object-contain cursor-crosshair relative z-10"
-          title="Klick um Turm zu bauen (Kosten: 50$)"
+          title={`Klick um ${TOWER_CONFIGS[selectedTowerType].label} zu bauen (Kosten: ${TOWER_CONFIGS[selectedTowerType].cost}$)`}
         />
         
         {/* Game Over / Start Overlay */}

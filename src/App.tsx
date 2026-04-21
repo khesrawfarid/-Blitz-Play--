@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, Fragment } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, 
@@ -1174,8 +1174,8 @@ export default function App() {
                           
                           <h4 className="text-white font-bold mt-4 mb-2">{t.terms2}</h4>
                           <p>{t.terms3}</p>
-                          <p>{t.terms4.split('\n').map((line: string, i: number) => <React.Fragment key={i}>{line}<br/></React.Fragment>)}</p>
-                          <p>{t.terms5.split('\n').map((line: string, i: number) => <React.Fragment key={i}>{line}<br/></React.Fragment>)}</p>
+                          <p>{t.terms4.split('\n').map((line: string, i: number) => <Fragment key={i}>{line}<br/></Fragment>)}</p>
+                          <p>{t.terms5.split('\n').map((line: string, i: number) => <Fragment key={i}>{line}<br/></Fragment>)}</p>
 
                           <h4 className="text-white font-bold mt-4 mb-2">{t.terms6}</h4>
                           <p>{t.terms7}</p>
