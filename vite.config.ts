@@ -4,7 +4,7 @@ import path from 'path';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base:    /'Wirtschaft'/ ,
+  base: '/BlitzPlayGame/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
