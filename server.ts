@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -106,6 +107,7 @@ async function startServer() {
   const server = http.createServer(app);
   const io = new SocketIOServer(server, { cors: { origin: "*" } });
 
+  app.use(cors());
   app.use(express.json());
 
   // Socket.IO Logic

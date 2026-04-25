@@ -241,7 +241,11 @@ export default function App() {
     setGenerationError(null);
     
     try {
-      const resp = await fetch("/api/generate-game", {
+      const url = window.location.hostname === 'localhost' 
+        ? '/api/generate-game' 
+        : 'https://blitzplaygame.onrender.com/api/generate-game';
+        
+      const resp = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
