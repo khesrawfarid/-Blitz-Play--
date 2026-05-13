@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Trophy, Users, Play, LogOut, CheckCircle2, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import historyTopicThumb from '../history-topic.svg';
+import mixedTopicThumb from '../mixed-topic.svg';
 
 let socket: Socket | null = null;
 
@@ -45,7 +47,7 @@ export default function PartyGame({ onExit, t }: { onExit: () => void, t: any })
 
     socket.on('connect_error', (err) => {
       console.error('Socket connect error:', err);
-      setError('Verbindung zum Server fehlgeschlagen: ' + err.message + ' (' + err.type + ')');
+      setError(t.connectionFailed ? t.connectionFailed + ': ' + err.message : 'Connection failed: ' + err.message);
     });
 
     socket.on('room-update', (r: Room) => {
@@ -111,14 +113,20 @@ export default function PartyGame({ onExit, t }: { onExit: () => void, t: any })
     });
   };
 
-  const [selectedTopic, setSelectedTopic] = useState('general');
+  const [selectedTopic, setSelectedTopic] = useState('mixed');
   const [selectedSubTopic, setSelectedSubTopic] = useState('flags-all');
 
   const TOPICS = [
-    { id: 'general', name: 'Allgemein', img: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&q=80&w=200&h=200' },
-    { id: 'geography', name: 'Geografie', img: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=200&h=200' },
-    { id: 'gaming', name: 'Gaming', img: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&q=80&w=200&h=200' },
-    { id: 'flags', name: 'Flaggen', img: 'https://images.unsplash.com/photo-1538681105587-85640961bf8b?auto=format&fit=crop&q=80&w=200&h=200' }
+    { id: 'mixed', name: t.topicMixed, img: mixedTopicThumb },
+    { id: 'general', name: t.topicGeneral, img: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&q=80&w=200&h=200' },
+    { id: 'geography', name: t.topicGeography, img: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=200&h=200' },
+    { id: 'gaming', name: t.topicGaming, img: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&q=80&w=200&h=200' },
+    { id: 'flags', name: t.topicFlags, img: 'https://images.unsplash.com/photo-1538681105587-85640961bf8b?auto=format&fit=crop&q=80&w=200&h=200' },
+    { id: 'music', name: t.topicMusic, img: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80&w=200&h=200' },
+    { id: 'movies', name: t.topicMovies, img: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&q=80&w=200&h=200' },
+    { id: 'science', name: t.topicScience, img: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&q=80&w=200&h=200' },
+    { id: 'sports', name: t.topicSports, img: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&q=80&w=200&h=200' },
+    { id: 'history', name: t.topicHistory, img: historyTopicThumb }
   ];
 
   const startGame = () => {
@@ -137,14 +145,14 @@ export default function PartyGame({ onExit, t }: { onExit: () => void, t: any })
   if (!room) {
     return (
       <div className="w-full h-full flex flex-col justify-center items-center p-6 space-y-8 relative z-10">
-        <h2 className="text-4xl font-black text-white drop-shadow-lg mb-8">Party Mode <span className="text-blitz-yellow">⚡</span></h2>
+        <h2 className="text-4xl font-black text-white drop-shadow-lg mb-8">{t.partyMode} <span className="text-blitz-yellow">⚡</span></h2>
         
         <div className="w-full max-w-sm bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-md shadow-2xl flex flex-col gap-4">
           {error && <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-xl text-red-200 text-sm text-center">{error}</div>}
           
           <input 
             type="text" 
-            placeholder="Dein Spielername" 
+            placeholder={t.playerNamePlaceholder} 
             value={name}
             onChange={e => setName(e.target.value)}
             className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-play-blue"
@@ -154,7 +162,7 @@ export default function PartyGame({ onExit, t }: { onExit: () => void, t: any })
           
           <input 
             type="text" 
-            placeholder="Code" 
+            placeholder={t.enterCode} 
             value={joinCode}
             onChange={e => setJoinCode(e.target.value.toUpperCase())}
             maxLength={4}

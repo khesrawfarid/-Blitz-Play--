@@ -10,8 +10,15 @@
 }
 
 @layer base {
+  * {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
   body {
-    @apply bg-bg-dark text-white font-sans overflow-x-hidden;
+    @apply bg-bg-dark text-white font-sans overflow-x-hidden overflow-y-auto;
     background-image: 
       radial-gradient(circle at 50% -20%, rgba(59, 130, 246, 0.15), transparent),
       radial-gradient(circle at 0% 100%, rgba(236, 72, 153, 0.05), transparent);

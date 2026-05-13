@@ -16,12 +16,15 @@ interface Enemy {
   speed: number;
   pathIndex: number;
   reward: number;
+  slowTimer: number; // ms remaining
+  slowFactor: number;
 }
 
 interface Tower {
   id: number;
   x: number;
   y: number;
+  type: TowerType;
   range: number;
   damage: number;
   fireRate: number; // shots per ms
@@ -37,27 +40,29 @@ interface Projectile {
   speed: number;
   damage: number;
   color: string;
+  isFrost?: boolean;
 }
 
-type TowerType = 'basic' | 'rapid' | 'sniper';
-
-const TOWER_CONFIGS: Record<TowerType, { cost: number, range: number, damage: number, fireRate: number, color: string, label: string }> = {
-  basic: { cost: 50, range: 3.5, damage: 15, fireRate: 800, color: '#3b82f6', label: 'Basic' },
-  rapid: { cost: 120, range: 2.5, damage: 8, fireRate: 200, color: '#ef4444', label: 'Rapid' },
-  sniper: { cost: 150, range: 8, damage: 80, fireRate: 2000, color: '#eab308', label: 'Sniper' },
-};
-
-interface Tower {
+interface Particle {
   id: number;
   x: number;
   y: number;
-  type: TowerType;
-  range: number;
-  damage: number;
-  fireRate: number; // shots per ms
-  lastFired: number;
-  cost: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  color: string;
+  size: number;
 }
+
+type TowerType = 'basic' | 'rapid' | 'sniper' | 'frost';
+
+const TOWER_CONFIGS: Record<TowerType, { cost: number, range: number, damage: number, fireRate: number, color: string, label: string, description: string, labelKey: string, descKey: string }> = {
+  basic: { cost: 50, range: 3.5, damage: 15, fireRate: 800, color: '#3b82f6', label: 'Basic', description: 'Solid defense', labelKey: 'towerBasic', descKey: 'towerBasicDesc' },
+  rapid: { cost: 120, range: 2.5, damage: 8, fireRate: 200, color: '#ef4444', label: 'Rapid', description: 'Extreme speed', labelKey: 'towerRapid', descKey: 'towerRapidDesc' },
+  sniper: { cost: 200, range: 10, damage: 120, fireRate: 2500, color: '#eab308', label: 'Sniper', description: 'One shot kill', labelKey: 'towerSniper', descKey: 'towerSniperDesc' },
+  frost: { cost: 150, range: 4, damage: 2, fireRate: 1200, color: '#22d3ee', label: 'Frost', description: 'Slows down enemies', labelKey: 'towerFrost', descKey: 'towerFrostDesc' },
+};
 const PATH = [
   { x: 0, y: 3 },
   { x: 5, y: 3 },
@@ -77,7 +82,7 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const [gameState, setGameState] = useState<'idle' | 'playing' | 'gameOver' | 'won'>('idle');
-  const [money, setMoney] = useState(100);
+  const [money, setMoney] = useState(250);
   const [lives, setLives] = useState(10);
   const [wave, setWave] = useState(1);
   const [score, setScore] = useState(0);
@@ -89,7 +94,8 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
     enemies: [] as Enemy[],
     towers: [] as Tower[],
     projectiles: [] as Projectile[],
-    money: 100,
+    particles: [] as Particle[],
+    money: 250,
     lives: 10,
     score: 0,
     wave: 1,
@@ -113,7 +119,8 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
       enemies: [],
       towers: [],
       projectiles: [],
-      money: 100,
+      particles: [],
+      money: 250,
       lives: 10,
       score: 0,
       wave: 1,
@@ -160,12 +167,37 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
     return () => cancelAnimationFrame(animationFrameId);
   }, []);
 
+  const spawnParticle = (x: number, y: number, color: string) => {
+    for (let i = 0; i < 5; i++) {
+      stateRef.current.particles.push({
+        id: Math.random(),
+        x,
+        y,
+        vx: (Math.random() - 0.5) * 100,
+        vy: (Math.random() - 0.5) * 100,
+        life: 1,
+        maxLife: 1,
+        color,
+        size: Math.random() * 3 + 2
+      });
+    }
+  };
+
   const update = (dt: number, time: number) => {
     const state = stateRef.current;
     if (state.lives <= 0) {
       state.state = 'gameOver';
       setGameState('gameOver');
       return;
+    }
+
+    // Update Particles
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const p = state.particles[i];
+      p.x += (p.vx * dt) / 1000;
+      p.y += (p.vy * dt) / 1000;
+      p.life -= dt / 1000;
+      if (p.life <= 0) state.particles.splice(i, 1);
     }
 
     // Spawning logic
@@ -188,9 +220,11 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
             y: PATH[0].y,
             hp: 20 * waveMultiplier,
             maxHp: 20 * waveMultiplier,
-            speed: Math.min(5, 1.5 + (state.wave * 0.15)), // grid units per second
+            speed: Math.min(6, 1.8 + (state.wave * 0.2)), // grid units per second
             pathIndex: 0,
-            reward: 5 + Math.floor(state.wave * 0.5)
+            reward: 15 + Math.floor(state.wave * 1.5),
+            slowTimer: 0,
+            slowFactor: 1
           });
           state.enemiesToSpawn--;
           state.spawnTimer = time;
@@ -209,6 +243,15 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
     // Move enemies
     for (let i = state.enemies.length - 1; i >= 0; i--) {
       const enemy = state.enemies[i];
+      
+      // Update slow effect
+      if (enemy.slowTimer > 0) {
+        enemy.slowTimer -= dt;
+        if (enemy.slowTimer <= 0) {
+          enemy.slowFactor = 1;
+        }
+      }
+
       const targetPoint = PATH[enemy.pathIndex + 1];
       
       if (!targetPoint) {
@@ -222,7 +265,9 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
       const dx = targetPoint.x - enemy.x;
       const dy = targetPoint.y - enemy.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const moveDist = (enemy.speed * dt) / 1000;
+      
+      const effectiveSpeed = enemy.speed * enemy.slowFactor;
+      const moveDist = (effectiveSpeed * dt) / 1000;
 
       if (dist <= moveDist) {
         // Reached waypoint
@@ -250,9 +295,10 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
             x: tower.x,
             y: tower.y,
             targetId: target.id,
-            speed: 10,
+            speed: tower.type === 'sniper' ? 20 : 10,
             damage: tower.damage,
-            color: TOWER_CONFIGS[tower.type].color
+            color: TOWER_CONFIGS[tower.type].color,
+            isFrost: tower.type === 'frost'
           });
           tower.lastFired = time;
         }
@@ -277,6 +323,14 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
       if (dist <= moveDist) {
         // Hit
         target.hp -= proj.damage;
+        
+        if (proj.isFrost) {
+          target.slowTimer = 2000;
+          target.slowFactor = 0.5;
+        }
+
+        spawnParticle(proj.x * GRID_SIZE + GRID_SIZE/2, proj.y * GRID_SIZE + GRID_SIZE/2, proj.color);
+        
         state.projectiles.splice(i, 1);
 
         if (target.hp <= 0) {
@@ -294,21 +348,18 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
         proj.y += (dy / dist) * moveDist;
       }
     }
-    
-    // Update react state softly if needed
-    // But since it's inside requestAnimationFrame, only sync what's needed
   };
 
   const draw = (ctx: CanvasRenderingContext2D) => {
     // Clear
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    // Draw semi-transparent dark background so path and grid stand out over the image
-    ctx.fillStyle = 'rgba(10, 15, 26, 0.7)';
+    // Draw semi-transparent dark background
+    ctx.fillStyle = 'rgba(10, 15, 26, 0.85)';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Draw Grid (optional debug/visuals)
+    // Draw Grid
     if (showGrid) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.03)';
       ctx.lineWidth = 1;
       for (let x = 0; x < CANVAS_WIDTH; x+=GRID_SIZE) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_HEIGHT); ctx.stroke();
@@ -318,10 +369,13 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
       }
     }
 
-    // Draw Path
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    // Draw Path with Glow
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'rgba(59, 130, 246, 0.5)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = GRID_SIZE;
     ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(PATH[0].x * GRID_SIZE + GRID_SIZE/2, PATH[0].y * GRID_SIZE + GRID_SIZE/2);
     for (let i = 1; i < PATH.length; i++) {
@@ -329,32 +383,51 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
     }
     ctx.stroke();
     
-    // Path center line
-    ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
+    // Path center line neon glow
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = '#3b82f6';
+    ctx.strokeStyle = '#3b82f6';
     ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
     // Base (End of path)
     const end = PATH[PATH.length - 1];
-    ctx.fillStyle = '#ec4899'; // Base color pink
+    ctx.fillStyle = '#ec4899';
     ctx.shadowColor = '#ec4899';
-    ctx.shadowBlur = 15;
-    ctx.fillRect(end.x * GRID_SIZE, end.y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+    ctx.shadowBlur = 20;
+    ctx.beginPath();
+    ctx.roundRect(end.x * GRID_SIZE + 4, end.y * GRID_SIZE + 4, GRID_SIZE - 8, GRID_SIZE - 8, 8);
+    ctx.fill();
     ctx.shadowBlur = 0;
 
     // Draw Towers
     stateRef.current.towers.forEach(tower => {
       const conf = TOWER_CONFIGS[tower.type];
-      ctx.fillStyle = conf.color;
-      ctx.fillRect(tower.x * GRID_SIZE + 4, tower.y * GRID_SIZE + 4, GRID_SIZE - 8, GRID_SIZE - 8);
-      // Range indicator
-      ctx.strokeStyle = conf.color.replace(')', ', 0.2)').replace('rgb', 'rgba'); // Fallback hack if using rgb/rgba; but we have hex colors.
-      // Better to just set globalAlpha:
-      ctx.globalAlpha = 0.2;
-      ctx.strokeStyle = conf.color;
+      const cx = tower.x * GRID_SIZE + GRID_SIZE/2;
+      const cy = tower.y * GRID_SIZE + GRID_SIZE/2;
+
+      // Base
+      ctx.fillStyle = '#1e293b';
       ctx.beginPath();
-      ctx.arc(tower.x * GRID_SIZE + GRID_SIZE/2, tower.y * GRID_SIZE + GRID_SIZE/2, tower.range * GRID_SIZE, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.roundRect(tower.x * GRID_SIZE + 2, tower.y * GRID_SIZE + 2, GRID_SIZE - 4, GRID_SIZE - 4, 4);
+      ctx.fill();
+
+      // Gem/Crystal
+      ctx.fillStyle = conf.color;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = conf.color;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Range indicator (subtle)
+      ctx.globalAlpha = 0.05;
+      ctx.fillStyle = conf.color;
+      ctx.beginPath();
+      ctx.arc(cx, cy, tower.range * GRID_SIZE, 0, Math.PI * 2);
+      ctx.fill();
       ctx.globalAlpha = 1.0;
     });
 
@@ -363,27 +436,61 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
       const cx = enemy.x * GRID_SIZE + GRID_SIZE/2;
       const cy = enemy.y * GRID_SIZE + GRID_SIZE/2;
       
+      const isSlowed = enemy.slowFactor < 1;
+
+      // Glow if slowed
+      if (isSlowed) {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#22d3ee';
+      }
+
       // Body
-      ctx.fillStyle = '#ef4444'; // Red enemy
+      ctx.fillStyle = isSlowed ? '#22d3ee' : '#ef4444';
       ctx.beginPath();
-      ctx.arc(cx, cy, GRID_SIZE/2 - 6, 0, Math.PI * 2);
+      ctx.arc(cx, cy, GRID_SIZE/4, 0, Math.PI * 2);
       ctx.fill();
+      
+      if (isSlowed) {
+         ctx.strokeStyle = 'white';
+         ctx.lineWidth = 1;
+         ctx.stroke();
+      }
+
+      ctx.shadowBlur = 0;
 
       // Health bar
-      const hpPercent = enemy.hp / enemy.maxHp;
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(cx - 10, cy - 15, 20, 4);
-      ctx.fillStyle = '#22c55e';
-      ctx.fillRect(cx - 10, cy - 15, 20 * hpPercent, 4);
+      const hpPercent = Math.max(0, enemy.hp / enemy.maxHp);
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.beginPath();
+      ctx.roundRect(cx - 12, cy - 18, 24, 4, 2);
+      ctx.fill();
+      
+      ctx.fillStyle = enemy.hp < enemy.maxHp * 0.3 ? '#ef4444' : '#22c55e';
+      ctx.beginPath();
+      ctx.roundRect(cx - 12, cy - 18, 24 * hpPercent, 4, 2);
+      ctx.fill();
     });
 
     // Draw Projectiles
     stateRef.current.projectiles.forEach(proj => {
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = proj.color;
       ctx.fillStyle = proj.color;
       ctx.beginPath();
-      ctx.arc(proj.x * GRID_SIZE + GRID_SIZE/2, proj.y * GRID_SIZE + GRID_SIZE/2, 4, 0, Math.PI * 2);
+      ctx.arc(proj.x * GRID_SIZE + GRID_SIZE/2, proj.y * GRID_SIZE + GRID_SIZE/2, proj.isFrost ? 5 : 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    });
+
+    // Draw Particles
+    stateRef.current.particles.forEach(p => {
+      ctx.globalAlpha = p.life / p.maxLife;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
       ctx.fill();
     });
+    ctx.globalAlpha = 1.0;
   };
 
   const isPathOrTower = (tx: number, ty: number) => {
@@ -449,16 +556,16 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
             <Heart className="text-play-pink" /> <span className="text-xl">{lives}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Shield className="text-play-blue" /> <span className="text-xl">Wave {wave}</span>
+            <Shield className="text-play-blue" /> <span className="text-xl">{t.wave} {wave}</span>
           </div>
           {waveWaitTimeLeft > 0 && gameState === 'playing' && (
             <div className="flex items-center gap-2 text-play-pink animate-pulse">
-              <span>Next Wave in {waveWaitTimeLeft}s</span>
+              <span>{t.nextWaveIn} {waveWaitTimeLeft}s</span>
             </div>
           )}
         </div>
         <div className="flex items-center gap-4">
-          <span className="font-mono text-white/50">Score: {score}</span>
+          <span className="font-mono text-white/50">{t.score}: {score}</span>
           <button onClick={onExit} className="p-2 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors">
             <LogOut size={18} />
           </button>
@@ -470,15 +577,24 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
           {(Object.keys(TOWER_CONFIGS) as TowerType[]).map(type => {
             const conf = TOWER_CONFIGS[type];
             const isSelected = selectedTowerType === type;
+            const canAfford = money >= conf.cost;
             return (
               <button
                 key={type}
                 onClick={() => setSelectedTowerType(type)}
-                className={`px-6 py-2 rounded-xl border-2 transition-all flex flex-col items-center gap-1 hover:border-white/50 ${isSelected ? 'bg-white/10' : 'bg-transparent'}`}
+                className={`px-4 py-2 rounded-xl border-2 transition-all flex flex-col items-center gap-1 hover:border-white/50 relative overflow-hidden ${isSelected ? 'bg-white/10 ring-2 ring-white/20' : 'bg-transparent'} ${!canAfford ? 'opacity-50 grayscale' : ''}`}
                 style={{ borderColor: isSelected ? conf.color : 'rgba(255,255,255,0.1)' }}
               >
-                <div className="font-bold tracking-wider" style={{ color: conf.color }}>{conf.label}</div>
-                <div className="text-white/70 text-sm">{conf.cost}$ | DMG: {conf.damage}</div>
+                <div className="font-black tracking-widest uppercase text-xs sm:text-sm" style={{ color: conf.color }}>{t[conf.labelKey]}</div>
+                <div className="text-white font-bold text-sm">{conf.cost}$</div>
+                <div className="text-white/40 text-[10px] hidden sm:block whitespace-nowrap">{t[conf.descKey]}</div>
+                {isSelected && (
+                  <motion.div 
+                    layoutId="tower-selection" 
+                    className="absolute inset-x-0 bottom-0 h-1 bg-white" 
+                    style={{ backgroundColor: conf.color }}
+                  />
+                )}
               </button>
             )
           })}
@@ -497,7 +613,7 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
           height={CANVAS_HEIGHT}
           onClick={handleCanvasClick}
           className="w-full max-w-4xl object-contain cursor-crosshair relative z-10"
-          title={`Klick um ${TOWER_CONFIGS[selectedTowerType].label} zu bauen (Kosten: ${TOWER_CONFIGS[selectedTowerType].cost}$)`}
+          title={`${t.clickToBuild} ${t[TOWER_CONFIGS[selectedTowerType].labelKey]} (${t.costs}: ${TOWER_CONFIGS[selectedTowerType].cost}$)`}
         />
         
         {/* Game Over / Start Overlay */}
@@ -507,27 +623,27 @@ export default function TowerDefenseGame({ onExit, t }: { onExit: () => void, t:
               <>
                 <h2 className="text-5xl font-black text-white mb-4">Tower Defense</h2>
                 <p className="text-white/60 text-lg max-w-md mb-8">
-                  Baue Türme um deine Basis zu beschützen. 
-                  <br/>Jeder Turm kostet <span className="text-blitz-yellow font-bold">50$</span>. Klicke einfach auf eine leere Stelle!
+                  {t.towerDefenseIntro}
+                  <br/>{t.towerDefenseCostNotice}
                 </p>
                 <button 
                   onClick={startGame}
                   className="px-10 py-5 bg-play-blue text-black font-black text-2xl rounded-2xl flex items-center gap-3 hover:scale-105 transition-transform"
                 >
-                  <Play fill="currentColor" /> Spiel Starten
+                  <Play fill="currentColor" /> {t.startGame}
                 </button>
               </>
             )}
 
             {gameState === 'gameOver' && (
               <>
-                <h2 className="text-5xl font-black text-play-pink mb-4">Basis Zerstört!</h2>
-                <p className="text-white/60 text-xl font-bold mb-8">Wave: {wave} | Score: {score}</p>
+                <h2 className="text-5xl font-black text-play-pink mb-4">{t.baseDestroyed}</h2>
+                <p className="text-white/60 text-xl font-bold mb-8">{t.wave}: {wave} | {t.score}: {score}</p>
                 <button 
                   onClick={startGame}
                   className="px-10 py-5 bg-white/10 text-white font-black text-2xl rounded-2xl flex items-center gap-3 hover:scale-105 hover:bg-white/20 transition-all border border-white/20"
                 >
-                  <RefreshCw className="text-blitz-yellow" /> Nochmal spielen
+                  <RefreshCw className="text-blitz-yellow" /> {t.playAgain}
                 </button>
               </>
             )}

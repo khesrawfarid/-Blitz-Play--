@@ -25,13 +25,17 @@ import {
 import { translations, Language } from './translations';
 import PartyGame from './components/PartyGame';
 import TowerDefenseGame from './components/TowerDefense';
+import WorldFrontGame from './components/WorldFrontGame';
+import ChessGame from './components/ChessGame';
 import neonMemoryThumb from './neon-memory.svg';
 import towerDefenseThumb from './tower-defense.svg';
+import partyQuizThumb from './party-quiz.svg';
 
 // --- Types ---
 interface Game {
   id: string;
   title: string;
+  titleKey?: string;
   thumbnail: string;
   genre: string;
   difficulty: 'easy' | 'medium' | 'hard';
@@ -75,14 +79,14 @@ const ALL_IQ_QUESTIONS = [
 ];
 
 const INITIAL_GAMES: Game[] = [
-  { id: 'party', title: 'Party Quiz (Online)', thumbnail: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=400&h=250', genre: 'party', difficulty: 'easy', isAI: false, isMultiplayer: true },
-  { id: '1', title: 'Blitz Clicker', thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400&h=250', genre: 'speed', difficulty: 'easy', isAI: false, isMultiplayer: false },
-  { id: '2', title: 'Neon Memory', thumbnail: neonMemoryThumb, genre: 'puzzle', difficulty: 'medium', isAI: true, isMultiplayer: false },
-  { id: '7', title: 'Math Blitz', thumbnail: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&q=80&w=400&h=250', genre: 'puzzle', difficulty: 'medium', isAI: false, isMultiplayer: false },
-  { id: '8', title: 'Reaction Master', thumbnail: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&q=80&w=400&h=250', genre: 'speed', difficulty: 'hard', isAI: false, isMultiplayer: true },
-  { id: '9', title: 'Tower Defense', thumbnail: towerDefenseThumb, genre: 'battle', difficulty: 'medium', isAI: false, isMultiplayer: false },
-  { id: 'iq', title: 'IQ Test', thumbnail: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&q=80&w=400&h=250', genre: 'puzzle', difficulty: 'hard', isAI: true, isMultiplayer: false },
-  { id: 'worldfront', title: 'WorldFront', thumbnail: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=400&h=250', genre: 'battle', difficulty: 'hard', isAI: false, isMultiplayer: false },
+  { id: 'party', title: 'Party Quiz (Online)', titleKey: 'partyQuizTitle', thumbnail: partyQuizThumb, genre: 'party', difficulty: 'easy', isAI: false, isMultiplayer: true },
+  { id: 'chess', title: 'Schach', titleKey: 'chessTitle', thumbnail: 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?auto=format&fit=crop&q=80&w=400&h=250', genre: 'puzzle', difficulty: 'hard', isAI: false, isMultiplayer: false },
+  { id: '1', title: 'Blitz Clicker', titleKey: 'blitzClickerTitle', thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400&h=250', genre: 'speed', difficulty: 'easy', isAI: false, isMultiplayer: false },
+  { id: '2', title: 'Neon Memory', titleKey: 'neonMemoryTitle', thumbnail: neonMemoryThumb, genre: 'puzzle', difficulty: 'medium', isAI: true, isMultiplayer: false },
+  { id: '7', title: 'Math Blitz', titleKey: 'mathBlitzTitle', thumbnail: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&q=80&w=400&h=250', genre: 'puzzle', difficulty: 'medium', isAI: false, isMultiplayer: false },
+  { id: '8', title: 'Reaction Master', titleKey: 'reactionMasterTitle', thumbnail: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&q=80&w=400&h=250', genre: 'speed', difficulty: 'hard', isAI: false, isMultiplayer: true },
+  { id: '9', title: 'Tower Defense', titleKey: 'towerDefenseTitle', thumbnail: towerDefenseThumb, genre: 'battle', difficulty: 'medium', isAI: false, isMultiplayer: false },
+  { id: 'iq', title: 'IQ Test', titleKey: 'iqTestTitle', thumbnail: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&q=80&w=400&h=250', genre: 'puzzle', difficulty: 'hard', isAI: true, isMultiplayer: false },
 ];
 
 // --- Components ---
@@ -121,7 +125,7 @@ const Logo = ({ size = "md" }: { size?: "sm" | "md" | "lg" }) => {
 };
 
 const GameCard = ({ game, t, onClick, onDelete }: { game: Game, t: any, onClick: () => void, onDelete?: () => void, key?: string }) => {
-  const isPlayable = ['1', '2', '7', '8', '9', 'iq', 'party'].includes(game.id) || game.isAI;
+  const isPlayable = true;
 
   return (
     <div
@@ -150,15 +154,6 @@ const GameCard = ({ game, t, onClick, onDelete }: { game: Game, t: any, onClick:
             </motion.div>
           )}
         </div>
-        
-        {!isPlayable && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-2">
-              <Clock className="text-white/50" size={32} />
-              <span className="font-bold text-white/80 uppercase tracking-widest text-sm">{t.comingSoon}</span>
-            </div>
-          </div>
-        )}
 
         {game.isAI && (
           <div className="absolute top-2 left-2 bg-play-pink/80 backdrop-blur-md px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
@@ -181,7 +176,9 @@ const GameCard = ({ game, t, onClick, onDelete }: { game: Game, t: any, onClick:
       </div>
       <div className="p-4">
         <div className="flex justify-between items-start mb-1">
-          <h3 className="font-bold text-lg group-hover:text-play-blue transition-colors">{game.title}</h3>
+          <h3 className="font-bold text-lg group-hover:text-play-blue transition-colors">
+            {game.titleKey && t[game.titleKey] ? t[game.titleKey] : game.title}
+          </h3>
         </div>
         <div className="flex gap-2 mt-2">
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/60 uppercase font-bold tracking-widest">
@@ -308,11 +305,11 @@ export default function App() {
 
     useEffect(() => {
       let timer: any;
-      if (isPlaying && timeLeft > 0 && !['iq', 'party', '9'].includes(game.id)) {
+      if (isPlaying && timeLeft > 0 && !['iq', 'party', '9', 'worldfront', 'chess'].includes(game.id)) {
         timer = setInterval(() => {
           setTimeLeft(prev => prev - 1);
         }, 1000);
-      } else if (timeLeft === 0 && !['iq', 'party', '9'].includes(game.id)) {
+      } else if (timeLeft === 0 && !['iq', 'party', '9', 'worldfront', 'chess'].includes(game.id)) {
         setIsPlaying(false);
       }
       return () => clearInterval(timer);
@@ -462,7 +459,7 @@ export default function App() {
 
     const startGame = () => {
       setScore(0);
-      setTimeLeft(game.id === '2' ? 60 : ['iq', 'party', '8', '9'].includes(game.id) ? -1 : 15);
+      setTimeLeft(game.id === '2' ? 60 : ['iq', 'party', '8', '9', 'worldfront', 'chess'].includes(game.id) ? -1 : 15);
       setIsPlaying(true);
       if (game.id === '1') spawnTarget();
       if (game.id === '2') initMemory();
@@ -495,7 +492,9 @@ export default function App() {
           <div className="h-16 px-6 flex items-center justify-between border-b border-white/5 bg-black/50">
             <div className="flex items-center gap-4">
               <Zap className="text-blitz-yellow" size={20} />
-              <h2 className="text-lg font-bold">{game.title}</h2>
+              <h2 className="text-lg font-bold">
+                {game.titleKey && t[game.titleKey] ? t[game.titleKey] : game.title}
+              </h2>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
               <PlusCircle className="rotate-45 text-white/60" size={28} />
@@ -513,19 +512,21 @@ export default function App() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] bg-bg-dark/95 backdrop-blur-2xl flex flex-col"
+        className="fixed inset-0 z-[100] bg-bg-dark/95 backdrop-blur-2xl flex flex-col pointer-events-auto"
       >
-        <div className="h-20 px-8 flex items-center justify-between border-b border-white/5">
+        <div className="h-20 px-4 sm:px-8 flex items-center justify-between border-b border-white/5 relative z-50">
           <div className="flex items-center gap-4">
             <Zap className="text-blitz-yellow" size={24} />
-            <h2 className="text-xl font-bold">{game.title}</h2>
+            <h2 className="text-xl font-bold">
+              {game.titleKey && t[game.titleKey] ? t[game.titleKey] : game.title}
+            </h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+          <button onClick={onClose} className="p-4 hover:bg-white/10 rounded-full transition-colors cursor-pointer relative z-[200]">
             <PlusCircle className="rotate-45 text-white/60" size={32} />
           </button>
         </div>
-        <div className="flex-1 p-8 flex flex-col items-center justify-center">
-          <div className="w-full max-w-4xl aspect-video bg-black rounded-3xl border-4 border-white/5 relative overflow-hidden flex items-center justify-center">
+        <div className="flex-1 flex flex-col items-center justify-center p-0 overflow-hidden min-h-0 relative z-10 pointer-events-auto">
+          <div className="w-full h-full bg-black relative overflow-hidden flex items-center justify-center border-none rounded-none max-w-none shadow-none">
             <div className="absolute inset-0 opacity-20">
               <img 
                 src={game.thumbnail} 
@@ -537,9 +538,8 @@ export default function App() {
               />
             </div>
             
-            {!isPlaying && (timeLeft > 0 || ['iq', 'party', '8', '9'].includes(game.id)) && (
+            {!isPlaying && (timeLeft > 0 || ['iq', 'party', '8', '9', 'worldfront', 'chess'].includes(game.id)) && (
               <div className="relative z-10 text-center">
-                {['1', '2', '7', '8', '9', 'iq', 'party'].includes(game.id) || game.isAI ? (
                   <>
                     <button
                       onClick={startGame}
@@ -547,39 +547,32 @@ export default function App() {
                     >
                       <Play fill="currentColor" size={40} />
                     </button>
-                    <h3 className="text-3xl font-black mb-2">Bereit für {game.title}?</h3>
+                    <h3 className="text-3xl font-black mb-2">
+                      {t.readyFor} {game.titleKey && t[game.titleKey] ? t[game.titleKey] : game.title}?
+                    </h3>
                     <p className="text-white/40">
-                      {game.id === '1' && "Klicke den Blitz so oft du kannst!"}
-                      {game.id === '2' && "Finde alle Paare!"}
-                      {game.id === '7' && "Löse die Rechenaufgaben!"}
-                      {game.id === '8' && "Klicke, sobald es grün wird!"}
-                      {game.id === '9' && "Verteidige deine Basis vor Feinden!"}
-                      {game.id === 'iq' && "Beantworte die Logikfragen!"}
-                      {game.id === 'party' && "Erstelle eine Party und spiele live mit Freunden!"}
-                      {game.isAI && !['1','2','7','8','9','iq','party'].includes(game.id) && "Fange die fallenden Objekte!"}
+                      {game.id === '1' && t.clickBlitz}
+                      {game.id === '2' && t.findPairs}
+                      {game.id === '7' && t.solveMath}
+                      {game.id === '8' && t.clickGreen}
+                      {game.id === '9' && t.towerDefenseDesc}
+                      {game.id === 'iq' && t.iqTestDesc}
+                      {game.id === 'party' && t.partyQuizDesc}
+                      {game.id === 'worldfront' && t.worldFrontDesc}
+                      {game.id === 'chess' && t.chessDesc}
+                      {game.isAI && !['1','2','7','8','9','iq','party','worldfront','chess'].includes(game.id) && t.catchObjects}
                     </p>
                   </>
-                ) : (
-                  <>
-                    <div className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center text-white/50 mx-auto mb-6">
-                      <Clock size={40} />
-                    </div>
-                    <h3 className="text-3xl font-black mb-2 text-white/50">Coming Soon</h3>
-                    <p className="text-white/40">
-                      Dieses Spiel wird bald verfügbar sein!
-                    </p>
-                  </>
-                )}
               </div>
             )}
 
             {isPlaying && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                {game.id !== 'party' && game.id !== '8' && game.id !== '9' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center z-40 pointer-events-auto">
+                {game.id !== 'party' && game.id !== 'worldfront' && game.id !== '8' && game.id !== '9' && game.id !== 'chess' && (
                   <>
-                    <div className="absolute top-4 left-4 text-2xl font-black text-play-blue">SCORE: {score}</div>
+                    <div className="absolute top-4 left-4 text-2xl font-black text-play-blue">{t.score}: {score}</div>
                     {game.id !== 'iq' && (
-                      <div className="absolute top-4 right-4 text-2xl font-black text-play-pink">TIME: {timeLeft}s</div>
+                      <div className="absolute top-4 right-4 text-2xl font-black text-play-pink">{t.time}: {timeLeft}s</div>
                     )}
                   </>
                 )}
@@ -630,7 +623,7 @@ export default function App() {
                   </div>
                 )}
 
-                {game.isAI && !['1','2','7','8','9','worldfront','iq','party'].includes(game.id) && (
+                {game.isAI && !['1','2','7','8','9','worldfront','iq','party','chess'].includes(game.id) && (
                   <div className="absolute inset-0 overflow-hidden">
                     {fallingObjects.map(obj => (
                       <motion.div
@@ -678,6 +671,12 @@ export default function App() {
                 {game.id === 'party' && (
                   <PartyGame onExit={() => { setScore(0); setIsPlaying(false); onClose(); }} t={t} />
                 )}
+                {game.id === 'worldfront' && (
+                  <WorldFrontGame onExit={() => { setScore(0); setIsPlaying(false); onClose(); }} t={t} />
+                )}
+                {game.id === 'chess' && (
+                  <ChessGame onBack={() => { setScore(0); setIsPlaying(false); onClose(); }} t={t} />
+                )}
 
                 {game.id === 'iq' && (
                   <div className="w-full h-full flex flex-col items-center justify-between p-4 sm:p-8 text-center relative z-10">
@@ -719,7 +718,7 @@ export default function App() {
               </div>
             )}
 
-            {timeLeft === 0 && !['party', '8', '9'].includes(game.id) && (
+            {timeLeft === 0 && !['party', '8', '9', 'worldfront', 'chess'].includes(game.id) && (
               <div className="relative z-10 text-center">
                 <h3 className={`text-5xl font-black mb-4 ${game.id === 'iq' ? 'text-play-blue glow-blue' : 'text-blitz-yellow glow-yellow'}`}>
                   {game.id === 'iq' ? t.testEnded : t.gameOver}

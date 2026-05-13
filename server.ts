@@ -18,12 +18,14 @@ interface Player {
 }
 
 interface Room {
+  type?: 'quiz' | 'chess';
   code: string;
   hostId: string;
   players: Player[];
   state: 'lobby' | 'playing' | 'leaderboard' | 'finished';
-  currentQuestion: number;
-  questions: any[];
+  currentQuestion?: number;
+  questions?: any[];
+  chessState?: any;
 }
 
 const rooms = new Map<string, Room>();
@@ -35,21 +37,25 @@ const QUESTION_BANK: Record<string, any[]> = {
     { q: "Was ist die Hauptstadt von Australien?", options: ["Sydney", "Melbourne", "Canberra", "Perth"], a: "Canberra" },
     { q: "Wie viele Planeten hat unser Sonnensystem?", options: ["7", "8", "9", "10"], a: "8" },
     { q: "In welchem Jahr fiel die Berliner Mauer?", options: ["1987", "1989", "1990", "1991"], a: "1989" },
-    { q: "Was ist das chemische Symbol für Gold?", options: ["Ag", "Au", "Go", "Gd"], a: "Au" }
+    { q: "Was ist das chemische Symbol für Gold?", options: ["Ag", "Au", "Go", "Gd"], a: "Au" },
+    { q: "Wer hat die Glühbirne kommerziell erfolgreich gemacht?", options: ["Nikola Tesla", "Thomas Edison", "Alexander Graham Bell", "Albert Einstein"], a: "Thomas Edison" },
+    { q: "Welches ist das kleinste Land der Welt?", options: ["Monaco", "Vatikanstadt", "San Marino", "Liechtenstein"], a: "Vatikanstadt" }
   ],
   geography: [
     { q: "Welcher ist der längste Fluss der Erde?", options: ["Nil", "Amazonas", "Jangtsekiang", "Mississippi"], a: "Nil" },
     { q: "In welchem Ozean liegen die Hawaii-Inseln?", options: ["Atlantik", "Indischer Ozean", "Pazifik", "Arktischer Ozean"], a: "Pazifik" },
     { q: "Welches Land hat die meisten Einwohner?", options: ["Indien", "China", "USA", "Indonesien"], a: "Indien" },
     { q: "Welches ist das größte Land der Welt nach Fläche?", options: ["Kanada", "USA", "China", "Russland"], a: "Russland" },
-    { q: "Was ist die Hauptstadt von Japan?", options: ["Seoul", "Peking", "Tokio", "Osaka"], a: "Tokio" }
+    { q: "Was ist die Hauptstadt von Japan?", options: ["Seoul", "Peking", "Tokio", "Osaka"], a: "Tokio" },
+    { q: "Welcher Kontinent ist der kälteste?", options: ["Europa", "Nordamerika", "Antarktika", "Asien"], a: "Antarktika" }
   ],
   gaming: [
     { q: "Welches war die erste Heimkonsole von Nintendo?", options: ["SNES", "Nintendo 64", "GameCube", "NES"], a: "NES" },
     { q: "Was baut man in Minecraft als erstes ab?", options: ["Stein", "Holz", "Erde", "Eisen"], a: "Holz" },
     { q: "Aus welchem Spiel stammt der Charakter 'Master Chief'?", options: ["Call of Duty", "Gears of War", "Halo", "Destiny"], a: "Halo" },
     { q: "Wie heißt das Spiel mit den fallenden Blöcken?", options: ["Tetris", "Pong", "Pac-Man", "Breakout"], a: "Tetris" },
-    { q: "Welche Firma entwickelte 'The Witcher'?", options: ["Bethesda", "BioWare", "CD Projekt Red", "Ubisoft"], a: "CD Projekt Red" }
+    { q: "Welche Firma entwickelte 'The Witcher'?", options: ["Bethesda", "BioWare", "CD Projekt Red", "Ubisoft"], a: "CD Projekt Red" },
+    { q: "Welches Videospiel-Franchise beinhaltet 'Pikachu'?", options: ["Digimon", "Pokémon", "Yu-Gi-Oh!", "Monster Hunter"], a: "Pokémon" }
   ],
   'flags-europe': [
     { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/de.png", options: ["Belgien", "Deutschland", "Österreich", "Schweiz"], a: "Deutschland" },
@@ -98,12 +104,54 @@ const QUESTION_BANK: Record<string, any[]> = {
     { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/ci.png", options: ["Irland", "Italien", "Elfenbeinküste", "Mali"], a: "Elfenbeinküste" },
     { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/sn.png", options: ["Kamerun", "Senegal", "Ghana", "Mali"], a: "Senegal" },
     { q: "Zu welchem Land gehört diese Flagge?", img: "https://flagcdn.com/w320/dz.png", options: ["Pakistan", "Algerien", "Ägypten", "Tunesien"], a: "Algerien" }
+  ],
+  music: [
+    { q: "Welcher Sänger ist als 'King of Pop' bekannt?", options: ["Elvis Presley", "Michael Jackson", "Prince", "Freddie Mercury"], a: "Michael Jackson" },
+    { q: "Welches Instrument hat Tasten, Pedale und Saiten?", options: ["Gitarre", "Schlagzeug", "Klavier", "Harfe"], a: "Klavier" },
+    { q: "Wer sang den Hit 'Rolling in the Deep'?", options: ["Adele", "Beyoncé", "Lady Gaga", "Rihanna"], a: "Adele" },
+    { q: "Welche legendäre Band bestand aus John, Paul, George und Ringo?", options: ["The Rolling Stones", "The Who", "The Beatles", "Pink Floyd"], a: "The Beatles" },
+    { q: "In welchem Jahrzehnt fand das Woodstock-Festival statt?", options: ["1950er", "1960er", "1970er", "1980er"], a: "1960er" },
+    { q: "Welcher Komponist war am Ende seines Lebens taub?", options: ["Mozart", "Bach", "Beethoven", "Chopin"], a: "Beethoven" }
+  ],
+  movies: [
+    { q: "Welcher Film hat das berühmte Zitat: 'Möge die Macht mit dir sein'?", options: ["Star Trek", "Star Wars", "Harry Potter", "Herr der Ringe"], a: "Star Wars" },
+    { q: "Wer spielte den Jack Dawson in 'Titanic'?", options: ["Brad Pitt", "Tom Cruise", "Leonardo DiCaprio", "Johnny Depp"], a: "Leonardo DiCaprio" },
+    { q: "Welcher Superheld wird von Bruce Wayne gespielt?", options: ["Superman", "Spider-Man", "Iron Man", "Batman"], a: "Batman" },
+    { q: "Wie heißt das Zauberei-Internat in Harry Potter?", options: ["Hogwarts", "Beauxbatons", "Durmstrang", "Ilvermorny"], a: "Hogwarts" },
+    { q: "Welcher Film gewann 2024 den Oscar als bester Film?", options: ["Oppenheimer", "Barbie", "Poor Things", "Dune 2"], a: "Oppenheimer" },
+    { q: "In welchem Film spielt eine rote oder blaue Pille eine Hauptrolle?", options: ["Inception", "Matrix", "Interstellar", "Avatar"], a: "Matrix" }
+  ],
+  science: [
+    { q: "Welches ist das härteste natürliche Material auf der Erde?", options: ["Gold", "Eisen", "Diamant", "Platin"], a: "Diamant" },
+    { q: "Wie nennt man die Kraft, die uns auf der Erde hält?", options: ["Magnetismus", "Gravitation", "Reibung", "Zentrifugalkraft"], a: "Gravitation" },
+    { q: "Welches Gas atmen Pflanzen bei der Fotosynthese ein?", options: ["Sauerstoff", "Stickstoff", "Helium", "Kohlendioxid"], a: "Kohlendioxid" },
+    { q: "Was ist das Zentrum unseres Sonnensystems?", options: ["Die Erde", "Die Sonne", "Der Mond", "Der Jupiter"], a: "Die Sonne" },
+    { q: "Aus wie vielen Knochen besteht das menschliche Skelett etwa?", options: ["150", "206", "250", "300"], a: "206" },
+    { q: "Was studiert ein Mykologe?", options: ["Sterne", "Fische", "Pilze", "Insekten"], a: "Pilze" }
+  ],
+  sports: [
+    { q: "Welches Land hat die meisten FIFA-Weltmeisterschaften gewonnen?", options: ["Deutschland", "Italien", "Brasilien", "Argentinien"], a: "Brasilien" },
+    { q: "In welcher Sportart gibt es einen 'Touchdown'?", options: ["Rugby", "Basketball", "American Football", "Eishockey"], a: "American Football" },
+    { q: "Wie oft finden die Olympischen Sommerspiele statt?", options: ["Alle 2 Jahre", "Alle 3 Jahre", "Alle 4 Jahre", "Alle 5 Jahre"], a: "Alle 4 Jahre" },
+    { q: "Wer hält den Weltrekord im 100-Meter-Sprint?", options: ["Carl Lewis", "Tyson Gay", "Usain Bolt", "Yohan Blake"], a: "Usain Bolt" },
+    { q: "Welcher Sport wird in Wimbledon gespielt?", options: ["Golf", "Tennis", "Polo", "Cricket"], a: "Tennis" },
+    { q: "Wie viele Spieler pro Team sind beim Eishockey auf dem Eis?", options: ["5", "6", "7", "11"], a: "6" }
+  ],
+  history: [
+    { q: "Wer war der erste Präsident der Vereinigten Staaten?", options: ["Abraham Lincoln", "Thomas Jefferson", "George Washington", "John Adams"], a: "George Washington" },
+    { q: "In welchem Jahr begann der Zweite Weltkrieg?", options: ["1914", "1939", "1945", "1989"], a: "1939" },
+    { q: "Wer entdeckte Amerika 1492?", options: ["Marco Polo", "Christoph Kolumbus", "James Cook", "Vasco da Gama"], a: "Christoph Kolumbus" },
+    { q: "Welche antike Zivilisation baute die Pyramiden von Gizeh?", options: ["Römer", "Griechen", "Ägypter", "Mayas"], a: "Ägypter" },
+    { q: "Wie hieß der berühmte Herrscher des antiken Roms, der 'Veni, vidi, vici' sagte?", options: ["Julius Cäsar", "Augustus", "Nero", "Caligula"], a: "Julius Cäsar" },
+    { q: "Welche Mauer fiel im November 1989?", options: ["Chinesische Mauer", "Klostermauer", "Berliner Mauer", "Jerusalemer Stadtmauer"], a: "Berliner Mauer" },
+    { q: "Wer war auch bekannt als 'Der Sonnenkönig'?", options: ["Heinrich VIII", "Karl der Große", "Ludwig XIV", "Philipp II"], a: "Ludwig XIV" },
+    { q: "In welchem Land begann die industrielle Revolution?", options: ["Frankreich", "Deutschland", "Großbritannien", "USA"], a: "Großbritannien" }
   ]
 };
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
   const server = http.createServer(app);
   const io = new SocketIOServer(server, { cors: { origin: "*" } });
 
@@ -141,15 +189,17 @@ async function startServer() {
 
     socket.on("start-game", (data) => {
       let code, topic;
+      console.log("start-game data received:", data);
       if (typeof data === 'string') {
         code = data;
         topic = 'general';
       } else if (data) {
         code = data.code;
-        topic = data.topic;
+        topic = data.topic || 'general';
       } else {
         return;
       }
+      console.log("Parsed code:", code, "topic:", topic);
 
       const room = rooms.get(code);
       if (room && room.hostId === socket.id) {
@@ -162,9 +212,13 @@ async function startServer() {
             ...(QUESTION_BANK['flags-americas'] || []),
             ...(QUESTION_BANK['flags-africa'] || [])
           ];
+        } else if (topic === 'mixed') {
+          selectedQuestions = Object.keys(QUESTION_BANK).flatMap(k => QUESTION_BANK[k]);
         } else {
           selectedQuestions = QUESTION_BANK[topic] || QUESTION_BANK['general'];
         }
+        
+        console.log("Selected questions length:", selectedQuestions.length, "for topic:", topic, "did fallback to general?", !QUESTION_BANK[topic]);
         
         // Shuffle and pick 5 questions max
         selectedQuestions = [...selectedQuestions].sort(() => 0.5 - Math.random()).slice(0, 5);
@@ -208,6 +262,55 @@ async function startServer() {
             }, 5000);
           }
         }
+      }
+    });
+
+    socket.on("create-chess-room", (callback) => {
+      const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+      socket.join(code);
+      const room: Room = {
+        type: 'chess',
+        code,
+        hostId: socket.id,
+        players: [],
+        state: 'lobby',
+        chessState: null
+      };
+      rooms.set(code, room);
+      callback({ code });
+    });
+
+    socket.on("join-chess-room", ({ code, name }, callback) => {
+      const room = rooms.get(code);
+      if (!room) return callback({ error: "Code ungültig!" });
+      if (room.type !== 'chess') return callback({ error: "Das ist kein Schach-Raum!" });
+      if (room.state !== 'lobby') return callback({ error: "Spiel läuft bereits!" });
+      if (room.players.length >= 2) return callback({ error: "Raum ist voll!" });
+
+      socket.join(code);
+      const color = room.players.length === 0 ? 'w' : 'b';
+      room.players.push({ id: socket.id, name, score: 0, hasAnswered: false, color } as any);
+      io.to(code).emit("chess-room-update", room);
+      callback({ success: true, room });
+    });
+
+    socket.on("chess-start", ({ code, timeLimit }) => {
+      const room = rooms.get(code);
+      if (room && room.hostId === socket.id && room.players.length === 2) {
+        room.state = 'playing';
+        room.chessState = {
+          fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+          timeLimit
+        };
+        io.to(code).emit("chess-start-game", room);
+      }
+    });
+
+    socket.on("chess-move", ({ code, fen }) => {
+      const room = rooms.get(code);
+      if (room && room.state === 'playing') {
+        room.chessState.fen = fen;
+        socket.to(code).emit("chess-moved", { fen });
       }
     });
 
