@@ -20,7 +20,8 @@ import {
   LayoutGrid,
   Trash2,
   X,
-  Home
+  Home,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { translations, Language } from './translations';
 import PartyGame from './components/PartyGame';
@@ -30,6 +31,7 @@ import ChessGame from './components/ChessGame';
 import neonMemoryThumb from './neon-memory.svg';
 import towerDefenseThumb from './tower-defense.svg';
 import partyQuizThumb from './party-quiz.svg';
+import SettingsModal from './SettingsModal';
 
 // --- Types ---
 interface Game {
@@ -214,6 +216,7 @@ export default function App() {
   const [customImage, setCustomImage] = useState<string | null>(null);
   const [useAiImage, setUseAiImage] = useState(true);
   const [isLangOpen, setIsLangOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [footerModal, setFooterModal] = useState<'privacy' | 'terms' | 'support' | 'api' | null>(null);
 
@@ -238,7 +241,7 @@ export default function App() {
     setGenerationError(null);
     
     try {
-      const url = '/api/generate-game';
+      const url = 'api/generate-game';
         
       const resp = await fetch(url, {
         method: "POST",
@@ -519,9 +522,11 @@ export default function App() {
               {game.titleKey && t[game.titleKey] ? t[game.titleKey] : game.title}
             </h2>
           </div>
-          <button onClick={onClose} className="p-4 hover:bg-white/10 rounded-full transition-colors cursor-pointer relative z-[200]">
-            <PlusCircle className="rotate-45 text-white/60" size={32} />
-          </button>
+          <div className="flex items-center gap-2 relative z-[200]">
+            <button onClick={onClose} className="p-4 hover:bg-white/10 rounded-full transition-colors cursor-pointer">
+              <PlusCircle className="rotate-45 text-white/60" size={32} />
+            </button>
+          </div>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-0 overflow-hidden min-h-0 relative z-10 pointer-events-auto">
           <div className="w-full h-full bg-black relative overflow-hidden flex items-center justify-center border-none rounded-none max-w-none shadow-none">
@@ -809,6 +814,7 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
+            
             <div className="relative">
               <button 
                 onClick={() => setIsLangOpen(!isLangOpen)}

@@ -116,14 +116,26 @@ const WILDERNESS_HP = 5;
 // Audio Utilities
 const audioCtx = typeof window !== 'undefined' ? new (window.AudioContext || (window as any).webkitAudioContext)() : null;
 let moduleAudioEnabled = true;
+let moduleAudioLevel = 1.0;
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('settingsChanged', (e: any) => {
+        moduleAudioLevel = e.detail?.audioLevel ?? 1.0;
+    });
+    const saved = localStorage.getItem('game_app_settings');
+    if (saved) {
+        try { moduleAudioLevel = JSON.parse(saved).audioLevel ?? 1.0; } catch(e){}
+    }
+}
 
 const playSynthSound = (frequency: number, type: OscillatorType, duration: number, volume: number = 0.1, fadeOut: boolean = true) => {
-    if (!audioCtx || audioCtx.state === 'suspended' || !moduleAudioEnabled) return;
+    if (!audioCtx || audioCtx.state === 'suspended' || !moduleAudioEnabled || moduleAudioLevel === 0) return;
+    const finalVolume = volume * moduleAudioLevel;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = type;
     osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
-    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gain.gain.setValueAtTime(finalVolume, audioCtx.currentTime);
     if (fadeOut) {
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
     }
@@ -151,7 +163,7 @@ const sounds = {
         const gain = audioCtx!.createGain();
         osc.frequency.setValueAtTime(100, now);
         osc.frequency.exponentialRampToValueAtTime(800, now + 1.5);
-        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.setValueAtTime(0.1 * moduleAudioLevel, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
         osc.connect(gain);
         gain.connect(audioCtx!.destination);
@@ -323,7 +335,43 @@ export default function WorldFrontGame({ onExit, t }: WorldFrontProps) {
 
       if (startWaters.length === 0 || destWaters.length === 0) return null;
 
-      let open = [];
+      class PriorityQueue {
+          data: {idx: number, f: number}[] = [];
+          push(val: {idx: number, f: number}) {
+              this.data.push(val);
+              this.up(this.data.length - 1);
+          }
+          pop() {
+              if (this.data.length === 0) return null;
+              if (this.data.length === 1) return this.data.pop()!;
+              const top = this.data[0];
+              this.data[0] = this.data.pop()!;
+              this.down(0);
+              return top;
+          }
+          up(i: number) {
+              while (i > 0) {
+                  const p = Math.floor((i - 1) / 2);
+                  if (this.data[i].f >= this.data[p].f) break;
+                  const tmp = this.data[i]; this.data[i] = this.data[p]; this.data[p] = tmp;
+                  i = p;
+              }
+          }
+          down(i: number) {
+              const len = this.data.length;
+              while (true) {
+                  let left = 2 * i + 1, right = 2 * i + 2, swap = i;
+                  if (left < len && this.data[left].f < this.data[swap].f) swap = left;
+                  if (right < len && this.data[right].f < this.data[swap].f) swap = right;
+                  if (swap === i) break;
+                  const tmp = this.data[i]; this.data[i] = this.data[swap]; this.data[swap] = tmp;
+                  i = swap;
+              }
+          }
+          get length() { return this.data.length; }
+      }
+
+      let open = new PriorityQueue();
       let cameFrom = new Map<number, number>();
       let gScore = new Map<number, number>();
       let destWaterIdxs = new Set(destWaters.map(c => c!.idx));
@@ -334,13 +382,9 @@ export default function WorldFrontGame({ onExit, t }: WorldFrontProps) {
       }
 
       let iterations = 0;
-      while(open.length > 0 && iterations < 15000) {
+      while(open.length > 0 && iterations < 30000) {
           iterations++;
-          let minI = 0;
-          for(let i=1; i<open.length; i++) {
-              if(open[i].f < open[minI].f) minI = i;
-          }
-          let current = open.splice(minI, 1)[0].idx;
+          let current = open.pop()!.idx;
 
           if (destWaterIdxs.has(current)) {
               let path = [];
@@ -405,74 +449,87 @@ export default function WorldFrontGame({ onExit, t }: WorldFrontProps) {
   const generateProcedural = () => {
         const w = GRID_W, h = GRID_H;
         const g: Cell[] = [];
-        const heightMap = new Float32Array(w * h);
+        const SEED = Math.random() * 10000;
         
-        const numContinents = 12;
-        for(let i=0; i<numContinents; i++) {
-            let cx = Math.floor(Math.random() * (w - 40)) + 20;
-            let cy = Math.floor(Math.random() * (h - 40)) + 20;
-            let radius = Math.random() * 40 + 20;
-            for(let py=0; py<h; py++) {
-                for(let px=0; px<w; px++) {
-                    let dx = px - cx;
-                    let dy = py - cy;
-                    let dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist < radius) {
-                        let impact = (1 - dist/radius) * (Math.random()*0.5 + 0.5);
-                        heightMap[py * w + px] += impact;
-                    }
-                }
-            }
-        }
+        const rand = (vx: number, vy: number) => {
+           const dot = vx * 12.9898 + vy * 78.233 + SEED;
+           const s = Math.sin(dot) * 43758.5453;
+           return s - Math.floor(s);
+        };
 
-        for(let iter=0; iter<3; iter++) {
-            const nextMap = new Float32Array(w * h);
-            for(let y=0; y<h; y++) {
-                for(let x=0; x<w; x++) {
-                    let sum = 0; let count = 0;
-                    for(let dy=-2; dy<=2; dy++) {
-                        for(let dx=-2; dx<=2; dx++) {
-                            let nx = x+dx, ny = y+dy;
-                            if(nx>=0 && nx<w && ny>=0 && ny<h) {
-                                sum += heightMap[ny * w + nx];
-                                count++;
-                            }
-                        }
-                    }
-                    nextMap[y * w + x] = sum / count + (Math.random() * 0.1 - 0.05);
-                }
-            }
-            for(let i=0; i<heightMap.length; i++) heightMap[i] = nextMap[i];
-        }
+        const noise2D = (x: number, y: number) => {
+           const ix = Math.floor(x); const iy = Math.floor(y);
+           const fx = x - ix; const fy = y - iy;
+           const a = rand(ix, iy); const b = rand(ix + 1, iy);
+           const c = rand(ix, iy + 1); const d = rand(ix + 1, iy + 1);
+           const ux = fx * fx * (3 - 2 * fx); const uy = fy * fy * (3 - 2 * fy);
+           return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+        };
 
+        const fbm = (x: number, y: number, scale: number, octaves: number) => {
+           let v = 0, a = 0.5, freq = scale;
+           for (let i = 0; i < octaves; i++) {
+               v += a * noise2D(x * freq, y * freq);
+               freq *= 2; a *= 0.5;
+           }
+           return v;
+        };
+        
         for (let y = 0; y < h; y++) {
             for (let x = 0; x < w; x++) {
-                let e = heightMap[y * w + x];
+                // Base terrain elevation
+                let e = fbm(x, y, 0.035, 5); 
+                
+                // Chokepoint modifier - add ridges and valleys
+                let cp = fbm(x + 500, y + 500, 0.08, 3);
+                if (cp > 0.6) e += 0.2; // Mountain ridges
+                else if (cp < 0.3) e -= 0.15; // Natural valleys / land bridges
+
+                // Island mask - make ocean mostly just near the edges, leaving a massive continent
                 const dx = Math.abs(x - w / 2) / (w / 2);
                 const dy = Math.abs(y - h / 2) / (h / 2);
-                const distSq = dx * dx + dy * dy;
-                e -= distSq * 0.4; 
+                // Dist ranges from 0 (center) to ~1.414 (corners)
+                const distFromCenter = Math.sqrt(dx * dx + dy * dy);
+                // Subtraction starts softly at 0.6 dist (60% to edges), and pushes e down at the very edges
+                e -= Math.pow(Math.max(0, distFromCenter - 0.6), 2) * 1.5;
+
+                // Moisture map
+                let m = fbm(x + 100, y + 100, 0.04, 4);
 
                 let type: 'plains' | 'highlands' | 'mountains' | 'water' | 'snow' | 'desert' = 'water';
-                if (e > 0.25) {
+                
+                if (e > 0.40) {
                     type = 'plains';
-                    if (e > 0.4) type = 'highlands';
-                    if (e > 0.5) type = 'mountains';
+                    if (e > 0.60) type = 'highlands';
+                    if (e > 0.75) type = 'mountains';
 
                     if (y < GRID_H * 0.15 || y > GRID_H * 0.85) {
                         type = 'snow';
-                    } else if (y > GRID_H * 0.35 && y < GRID_H * 0.45 && Math.random() > 0.5) {
-                        type = 'desert';
+                    } else if (y > GRID_H * 0.3 && y < GRID_H * 0.7) {
+                        if (type === 'plains' && m < 0.4) {
+                            type = 'desert';
+                        }
                     }
+                }
+                
+                // Resource Generation (Strategic Locations)
+                let resource: 'gold' | null = null;
+                if (type !== 'water' && type !== 'snow') {
+                    let rNoise = rand(x, y);
+                    if (type === 'mountains' && rNoise > 0.95) resource = 'gold'; // 5% in mountains
+                    else if (type === 'highlands' && rNoise > 0.97) resource = 'gold'; // 3% in highlands
+                    else if (type === 'desert' && rNoise > 0.98) resource = 'gold'; // 2% in desert
+                    else if (rNoise > 0.995) resource = 'gold'; // 0.5% in plains
                 }
                 
                 g.push({
                     x, y, idx: getCellIndex(x, y),
                     ownerId: null,
                     type,
-                    hp: type === 'water' ? 9999 : (type === 'mountains' ? 30 : WILDERNESS_HP),
+                    hp: type === 'water' ? 9999 : (type === 'mountains' ? 50 : WILDERNESS_HP),
                     maxHp: 20,
-                    building: null
+                    building: null,
+                    resource
                 });
             }
         }
@@ -558,190 +615,31 @@ export default function WorldFrontGame({ onExit, t }: WorldFrontProps) {
                         bgCtx.fillRect(cell.x * CELL_SIZE, cell.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
                     }
                 }
+
+                // Draw Resource 
+                if (cell.resource === 'gold') {
+                    bgCtx.fillStyle = '#fbbf24'; 
+                    bgCtx.beginPath();
+                    bgCtx.arc(cell.x * CELL_SIZE + CELL_SIZE/2 - 1, cell.y * CELL_SIZE + CELL_SIZE/2 + 1, CELL_SIZE/3.5, 0, 2*Math.PI);
+                    bgCtx.fill();
+                    bgCtx.fillStyle = '#fcd34d'; 
+                    bgCtx.beginPath();
+                    bgCtx.arc(cell.x * CELL_SIZE + CELL_SIZE/2 + 1, cell.y * CELL_SIZE + CELL_SIZE/2 - 1, CELL_SIZE/4, 0, 2*Math.PI);
+                    bgCtx.fill();
+                    bgCtx.strokeStyle = '#b45309';
+                    bgCtx.lineWidth = 0.5;
+                    bgCtx.stroke();
+                }
             }
             bgCanvasRef.current = bgCanvas;
         }
     };
 
     const runGeneration = () => {
-        const img = new Image();
-        img.crossOrigin = 'Anonymous';
-        img.src = '/map.png?t=' + Date.now();
-        img.onload = () => {
-            try {
-                // Auto crop detection to find actual map bounds
-                const detectCanvas = document.createElement('canvas');
-                detectCanvas.width = img.width;
-                detectCanvas.height = img.height;
-                const dCtx = detectCanvas.getContext('2d', { willReadFrequently: true });
-                let minX = 0, minY = 0, maxX = img.width, maxY = img.height;
-                
-                if (dCtx) {
-                    dCtx.drawImage(img, 0, 0);
-                    const dData = dCtx.getImageData(0, 0, img.width, img.height).data;
-                    
-                    let foundMinX = img.width, foundMinY = img.height, foundMaxX = 0, foundMaxY = 0;
-                    for (let y = 0; y < img.height; y += 4) {
-                        for (let x = 0; x < img.width; x += 4) {
-                            const idx = (y * img.width + x) * 4;
-                            const r = dData[idx], g = dData[idx+1], b = dData[idx+2];
-                            
-                            const isWhite = r > 245 && g > 245 && b > 245;
-                            
-                            if (!isWhite) {
-                                if (x < foundMinX) foundMinX = x;
-                                if (x > foundMaxX) foundMaxX = x;
-                                if (y < foundMinY) foundMinY = y;
-                                if (y > foundMaxY) foundMaxY = y;
-                            }
-                        }
-                    }
-                    if (foundMaxX > foundMinX && foundMaxY > foundMinY) {
-                        minX = foundMinX;
-                        minY = foundMinY;
-                        maxX = foundMaxX;
-                        maxY = foundMaxY;
-                    }
-                }
-
-                const cropW = maxX - minX;
-                const cropH = maxY - minY;
-
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = GRID_W;
-                tempCanvas.height = GRID_H;
-                
-                const tCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
-                if (tCtx) {
-                    tCtx.fillStyle = '#000000';
-                    tCtx.fillRect(0, 0, GRID_W, GRID_H);
-                    
-                    const imgRatio = cropW / cropH;
-                    const gridRatio = GRID_W / GRID_H;
-                    let drawW = GRID_W;
-                    let drawH = GRID_H;
-                    let drawX = 0;
-                    let drawY = 0;
-                    
-                    if (imgRatio > gridRatio) {
-                        drawH = GRID_W / imgRatio;
-                        drawY = (GRID_H - drawH) / 2;
-                    } else {
-                        drawW = GRID_H * imgRatio;
-                        drawX = (GRID_W - drawW) / 2;
-                    }
-
-                    // No need to zoom since we cropped the exact bounds
-                    const zoomFactor = 1.0;
-                    drawW *= zoomFactor;
-                    drawH *= zoomFactor;
-                    drawX = (GRID_W - drawW) / 2;
-                    drawY = (GRID_H - drawH) / 2;
-                    
-                    tCtx.drawImage(img, minX, minY, cropW, cropH, drawX, drawY, drawW, drawH);
-                    const data = tCtx.getImageData(0, 0, GRID_W, GRID_H).data;
-                    
-                    const biomeMap = new Array(GRID_W * GRID_H).fill('unknown');
-                    
-                    for (let y = 0; y < GRID_H; y++) {
-                        for (let x = 0; x < GRID_W; x++) {
-                            const idx = (y * GRID_W + x) * 4;
-                            const r = data[idx];
-                            const gVal = data[idx+1];
-                            const b = data[idx+2];
-                            
-                            // Out of bounds black background borders of image matching
-                            if (x < drawX || x >= drawX + drawW || y < drawY || y >= drawY + drawH) {
-                                biomeMap[y * GRID_W + x] = 'water';
-                            } else if (r < 75 && gVal < 75 && b < 75 && Math.abs(r - gVal) < 20 && Math.abs(b - gVal) < 20) {
-                                // Text/borders are unknown, rely on interpolation
-                            } else if (b > 100 && b > r + 30 && b > gVal + 30) {
-                                biomeMap[y * GRID_W + x] = 'water'; // Very clear blue
-                            } else if (b > r + 20 && b > gVal + 15 && gVal > 40) {
-                                biomeMap[y * GRID_W + x] = 'water'; // Standard blue ocean
-                            } else if (r < 60 && gVal < 80 && b < 100 && b > r + 15 && b > gVal + 10) {
-                                biomeMap[y * GRID_W + x] = 'water'; // Dark ocean
-                            } else if (r > 200 && gVal > 200 && b > 200) {
-                                biomeMap[y * GRID_W + x] = (y < 200 || y > 730) ? 'snow' : 'mountains';
-                            } else if (r > 150 && gVal > 120 && b < 120 && r > b + 20) {
-                                biomeMap[y * GRID_W + x] = 'desert';
-                            } else if (gVal > r && gVal > b) {
-                                biomeMap[y * GRID_W + x] = 'plains';
-                            } else {
-                                biomeMap[y * GRID_W + x] = 'plains'; // Fallback everything else to plains
-                            }
-                        }
-                    }
-
-                    // Pass 2: Nearest neighbor interpolation
-                    const newG: Cell[] = [];
-                    for (let y = 0; y < GRID_H; y++) {
-                        for (let x = 0; x < GRID_W; x++) {
-                            let cellType = biomeMap[y * GRID_W + x];
-                            if (cellType === 'unknown') {
-                                let found = false;
-                                for (let radius = 1; radius < 25 && !found; radius++) {
-                                    let landFound = false;
-                                    let waterFound = false;
-                                    let landType = 'plains';
-                                    for(let dx = -radius; dx <= radius; dx++) {
-                                        for(let dy = -radius; dy <= radius; dy++) {
-                                            const nx = x + dx; const ny = y + dy;
-                                            if (nx >= 0 && nx < GRID_W && ny >= 0 && ny < GRID_H) {
-                                                const neighbor = biomeMap[ny * GRID_W + nx];
-                                                if (neighbor !== 'unknown') {
-                                                    if (neighbor === 'water') waterFound = true;
-                                                    else { landFound = true; landType = neighbor; }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    if (landFound) { cellType = landType; found = true; }
-                                    else if (waterFound) { cellType = 'water'; found = true; }
-                                }
-                                if (!found) cellType = 'plains';
-                            }
-                            
-                            let type = cellType as 'plains'|'highlands'|'mountains'|'water'|'snow'|'desert';
-                            if (type === 'plains' && Math.random() > 0.85) type = 'highlands';
-
-                            const idx = (y * GRID_W + x) * 4;
-                            const r = data[idx];
-                            const gVal = data[idx+1];
-                            const b = data[idx+2];
-                            const colorHex = `#${r.toString(16).padStart(2,'0')}${gVal.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
-
-                            newG.push({
-                                x, y, idx: getCellIndex(x, y),
-                                ownerId: null,
-                                type,
-                                hp: type === 'water' ? 9999 : (type === 'mountains' ? 50 : WILDERNESS_HP),
-                                maxHp: 20,
-                                building: null,
-                                color: colorHex
-                            });
-                        }
-                    }
-                    
-                    // No fallback check - use the image regardless of land count
-                    gridRef.current = newG;
-                    prerenderBg(newG);
-                    setGameState('spawn');
-                }
-            } catch (e) {
-                console.error("Image gen failed:", e);
-                const genG = generateProcedural();
-                gridRef.current = genG;
-                prerenderBg(genG);
-                setGameState('spawn');
-            }
-        };
-        img.onerror = () => {
-            const genG = generateProcedural();
-            gridRef.current = genG;
-            prerenderBg(genG);
-            setGameState('spawn');
-        };
+        const genG = generateProcedural();
+        gridRef.current = genG;
+        prerenderBg(genG);
+        setGameState('spawn');
     };
     
     useEffect(() => {
@@ -780,6 +678,364 @@ export default function WorldFrontGame({ onExit, t }: WorldFrontProps) {
   };
 
 
+
+  
+  const updatePhysics = (dt: number) => {
+    let grid = gridRef.current;
+    let players = playersRef.current;
+    let dtScale = dt / 50;
+    
+// Process Particles
+    for (let i = particlesRef.current.length - 1; i >= 0; i--) {
+        let p = particlesRef.current[i]; if(p.type === "ship") p.age = (p.age || 0) + dtScale;
+        
+        if (p.type === 'ship') {
+            let avoiding = false;
+            
+            
+            // Self-destruct/refund if stuck too long (e.g. 1000 ticks)
+            if (p.age > 1000) {
+                if (p.ownerId && p.payload) players[p.ownerId].pop += p.payload;
+                particlesRef.current.splice(i, 1);
+                continue;
+            }
+
+            let tc = p.targetCell !== undefined ? grid[p.targetCell] : null;
+            let tx = tc ? tc.x * CELL_SIZE + CELL_SIZE/2 : p.x;
+            let ty = tc ? tc.y * CELL_SIZE + CELL_SIZE/2 : p.y;
+            let distToTarget = Math.hypot(p.x - tx, p.y - ty);
+
+            // Improved land avoidance
+            let lookAhead = 15;
+            let checkX = Math.floor((p.x + p.vx * lookAhead) / CELL_SIZE);
+            let checkY = Math.floor((p.y + p.vy * lookAhead) / CELL_SIZE);
+            
+            if (distToTarget > 40 && checkX >= 0 && checkX < GRID_W && checkY >= 0 && checkY < GRID_H) {
+                let cellAhead = grid[getCellIndex(checkX, checkY)];
+                if (cellAhead.type !== 'water' && p.targetCell !== cellAhead.idx) {
+                    // Check left and right to see which way is clearer
+                    let speed = Math.hypot(p.vx, p.vy);
+                    let baseAngle = Math.atan2(p.vy, p.vx);
+                    
+                    let leftClear = true;
+                    let rightClear = true;
+                    
+                    // Sample left
+                    let la = baseAngle - 0.5;
+                    let lcx = Math.floor((p.x + Math.cos(la) * lookAhead) / CELL_SIZE);
+                    let lcy = Math.floor((p.y + Math.sin(la) * lookAhead) / CELL_SIZE);
+                    if (lcx>=0 && lcx<GRID_W && lcy>=0 && lcy<GRID_H && grid[getCellIndex(lcx, lcy)].type !== 'water') leftClear = false;
+                    
+                    // Sample right
+                    let ra = baseAngle + 0.5;
+                    let rcx = Math.floor((p.x + Math.cos(ra) * lookAhead) / CELL_SIZE);
+                    let rcy = Math.floor((p.y + Math.sin(ra) * lookAhead) / CELL_SIZE);
+                    if (rcx>=0 && rcx<GRID_W && rcy>=0 && rcy<GRID_H && grid[getCellIndex(rcx, rcy)].type !== 'water') rightClear = false;
+
+                    let steer = 0.2;
+                    if (!leftClear && rightClear) steer = 0.4;
+                    else if (leftClear && !rightClear) steer = -0.4;
+                    else if (!leftClear && !rightClear) steer = 0.6; // both blocked, hard right
+                    else {
+                        // both clear or both blocked similarly, steer towards target
+                        let targetAngle = Math.atan2(ty - p.y, tx - p.x);
+                        let diff = targetAngle - baseAngle;
+                        while(diff > Math.PI) diff -= Math.PI*2;
+                        while(diff < -Math.PI) diff += Math.PI*2;
+                        steer = diff > 0 ? 0.3 : -0.3;
+                    }
+
+                    let a = baseAngle + steer;
+                    p.vx = Math.cos(a) * speed;
+                    p.vy = Math.sin(a) * speed;
+                    avoiding = true;
+                }
+            }
+            
+            if (!avoiding && tc) {
+                let currentSpeed = Math.hypot(p.vx, p.vy);
+                let targetAngle = Math.atan2(ty - p.y, tx - p.x);
+                let currentAngle = Math.atan2(p.vy, p.vx);
+                let diff = targetAngle - currentAngle;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                
+                let a = currentAngle + diff * 0.15; // Steer slightly more aggressively
+                p.vx = Math.cos(a) * currentSpeed;
+                p.vy = Math.sin(a) * currentSpeed;
+            }
+            
+            if (p.path) {
+                let lastP = p.path[p.path.length-1];
+                if (Math.hypot(p.x - lastP.x, p.y - lastP.y) > 10) {
+                    p.path.push({x: p.x, y: p.y});
+                }
+            }
+        }
+        
+        p.x += p.vx * dtScale; p.y += p.vy * dtScale;
+        
+        let cx = Math.floor(p.x / CELL_SIZE);
+        let cy = Math.floor(p.y / CELL_SIZE);
+        if (cx >= 0 && cx < GRID_W && cy >= 0 && cy < GRID_H) {
+            let currentCell = grid[getCellIndex(cx, cy)];
+            if (p.type === 'ship' && currentCell.type !== 'water' && currentCell.ownerId !== p.ownerId) {
+                p.targetCell = currentCell.idx; // force landing on this coast
+            }
+        }
+        
+        if ((p.type === 'troop' || p.type === 'ship') && p.targetCell !== undefined && p.ownerId && p.payload) {
+            let tc = grid[p.targetCell];
+            let tx = tc.x * CELL_SIZE + CELL_SIZE/2;
+            let ty = tc.y * CELL_SIZE + CELL_SIZE/2;
+            let dist = Math.sqrt(Math.pow(p.x - tx, 2) + Math.pow(p.y - ty, 2));
+            let speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+            
+            if (p.type === 'ship' && Math.random() < 0.1) {
+                // Ship wake
+                particlesRef.current.push({ x: p.x, y: p.y, vx: 0, vy: 0, life: 1, maxLife: 1, color: '#93c5fd', size: 2, type: 'fx' });
+            }
+
+            let hitDist = p.type === 'ship' ? speed + CELL_SIZE * 4 : speed + CELL_SIZE;
+            if (dist < hitDist) {
+                // Impact - Ships can only impact land or its actual target cell if it reached it
+                if (p.type === 'ship' && tc.type === 'water') {
+                    // Reached target water cell but no land yet? Look for adjacent land.
+                    let getSafe = (x:number, y:number) => (x>=0 && x<GRID_W && y>=0 && y<GRID_H) ? grid[y * GRID_W + x] : null;
+                    let adjs = [
+                        getSafe(tc.x+1, tc.y), getSafe(tc.x-1, tc.y),
+                        getSafe(tc.x, tc.y+1), getSafe(tc.x, tc.y-1)
+                    ].filter(c => c && c.type !== 'water');
+                    if (adjs.length > 0) {
+                        p.targetCell = adjs[0].idx; // Shift target to nearest land
+                        continue; // try again next frame
+                    }
+                }
+
+                if (tc.ownerId !== p.ownerId) {
+                    let isProtected = false;
+                    if (tc.ownerId && defensesByOwner[tc.ownerId]) {
+                        for (let d of defensesByOwner[tc.ownerId]) {
+                            if (Math.hypot(d.x - tc.x, d.y - tc.y) <= 15) { isProtected = true; break; }
+                        }
+                    }
+                    let multiplier = isProtected ? 10 : 1;
+                    
+                    let cellMaxHp = tc.ownerId ? 20 + (tc.building ? 20 : 0) : (tc.type === 'mountains' ? 50 : WILDERNESS_HP);
+                    let effectivePayload = Math.floor(p.payload / multiplier);
+                    if (effectivePayload < 1) effectivePayload = 1;
+                    
+                    let dmg = Math.min(tc.hp, effectivePayload);
+                    tc.hp -= dmg;
+                    
+                    if (tc.hp <= 0) {
+                        let excess = p.payload - (dmg * multiplier);
+                        if (excess < 0) excess = 0;
+                        let oldOwner = tc.ownerId;
+                        if (oldOwner) {
+                            players[oldOwner].lastAttackerId = p.ownerId;
+                        }
+                        setCellOwner(tc, p.ownerId);
+                        tc.hp = 20;
+                        setCellBuilding(tc, null);
+                        
+                        if (excess > 0) {
+                            let cx = tc.x; let cy = tc.y;
+                            let getSafe = (x:number, y:number) => (x>=0 && x<GRID_W && y>=0 && y<GRID_H) ? grid[y * GRID_W + x] : null;
+                            let adjs = [
+                                getSafe(cx+1, cy), getSafe(cx-1, cy),
+                                getSafe(cx, cy+1), getSafe(cx, cy-1)
+                            ].filter(c => c && c.type !== 'water' && c.ownerId !== p.ownerId);
+                            
+                            if (adjs.length > 0) {
+                                let payloadPerDir = Math.floor(excess / adjs.length);
+                                let remainder = excess % adjs.length;
+                                let first = true;
+                                
+                                for (let j=0; j<adjs.length; j++) {
+                                    let nextTarget = adjs[j];
+                                    let pload = payloadPerDir + (first ? remainder : 0);
+                                    if (pload <= 0) continue;
+                                    
+                                    let tx2 = nextTarget.x * CELL_SIZE + CELL_SIZE/2;
+                                    let ty2 = nextTarget.y * CELL_SIZE + CELL_SIZE/2;
+                                    let dx2 = tx2 - p.x; let dy2 = ty2 - p.y;
+                                    let len = Math.sqrt(dx2*dx2 + dy2*dy2) || 1;
+                                    let spd = p.type === 'ship' ? 1.5 : 2;
+                                    
+                                    if (first) {
+                                        p.payload = pload;
+                                        p.targetCell = nextTarget.idx;
+                                        p.vx = (dx2/len)*spd;
+                                        p.vy = (dy2/len)*spd;
+                                        first = false;
+                                    } else {
+                                        particlesRef.current.push({
+                                            x: p.x, y: p.y,
+                                            vx: (dx2/len)*spd, vy: (dy2/len)*spd,
+                                            life: 1, maxLife: 1, color: p.color,
+                                            size: p.size, type: p.type, ownerId: p.ownerId,
+                                            targetCell: nextTarget.idx, payload: pload
+                                        });
+                                    }
+                                }
+                                if (!first) continue; // we reused 'p', so skip destroying it
+                            }
+                            // If we didn't branch (adjs.length === 0 or payload too small), refund remainder
+                            players[p.ownerId].pop += excess;
+                        }
+                    } else {
+                        // hit spark removed
+                    }
+                } else {
+                    players[p.ownerId].pop += p.payload; // Refund if hit own cell
+                }
+                particlesRef.current.splice(i, 1);
+                continue;
+            }
+        } else {
+            p.life -= 0.05 * dtScale;
+            if (p.life <= 0) particlesRef.current.splice(i, 1);
+        }
+    }
+
+    // Process Nukes
+    for (let i = projectilesRef.current.length - 1; i >= 0; i--) {
+        let proj = projectilesRef.current[i];
+        proj.progress += 0.01 * dtScale;
+        proj.x = proj.startX + (proj.targetX - proj.startX) * proj.progress;
+        proj.y = proj.startY + (proj.targetY - proj.startY) * proj.progress;
+        spawnFX(proj.x, proj.y, '#fef08a', 2, 1);
+        
+        if (proj.progress >= 1) {
+            sounds.nukeExplode();
+            let tx = Math.floor(proj.targetX/CELL_SIZE);
+            let ty = Math.floor(proj.targetY/CELL_SIZE);
+            
+            // detonate radius 5
+            for (let y = ty - 5; y <= ty + 5; y++) {
+                for (let x = tx - 5; x <= tx + 5; x++) {
+                    let d = Math.sqrt((x-tx)**2 + (y-ty)**2);
+                    if (d <= 5) {
+                        let c = grid[getCellIndex(x, y)];
+                        if (c && c.type !== 'water') {
+                            setCellOwner(c, null);
+                            setCellBuilding(c, null);
+                            c.hp = c.type === 'mountains' ? 50 : WILDERNESS_HP;
+                        }
+                    }
+                }
+            }
+            spawnFX(tx*CELL_SIZE, ty*CELL_SIZE, '#ffffff', 50, 10);
+            spawnFX(tx*CELL_SIZE, ty*CELL_SIZE, '#f97316', 80, 6);
+            pushNotification(`Nuclear Detonation!`);
+            projectilesRef.current.splice(i, 1);
+        }
+    }
+
+    // Process Trade Ships
+    for (let i = tradeShipsRef.current.length - 1; i >= 0; i--) {
+        let ts = tradeShipsRef.current[i];
+        
+        if (ts.path && ts.pathIndex !== undefined && ts.pathIndex < ts.path.length) {
+            let targetNode = ts.path[ts.pathIndex];
+            let tpx = targetNode.x * CELL_SIZE + CELL_SIZE/2;
+            let tpy = targetNode.y * CELL_SIZE + CELL_SIZE/2;
+            let dist = Math.hypot(tpx - ts.px, tpy - ts.py);
+            
+            let moveAmount = 2.0 * dtScale; // 2 pixels per tick
+            
+            if (dist <= moveAmount) {
+                ts.px = tpx;
+                ts.py = tpy;
+                ts.pathIndex++;
+                if (ts.pathIndex >= ts.path.length) {
+                    ts.progress = 1.0;
+                }
+            } else {
+                let ang = Math.atan2(tpy - ts.py, tpx - ts.px);
+                ts.px += Math.cos(ang) * moveAmount;
+                ts.py += Math.sin(ang) * moveAmount;
+                ts.angle = ang;
+            }
+        } else {
+            ts.progress += ts.speed * dtScale;
+            ts.px = ts.sx + (ts.tx - ts.sx) * ts.progress;
+            ts.py = ts.sy + (ts.ty - ts.sy) * ts.progress;
+            ts.angle = Math.atan2(ts.ty - ts.sy, ts.tx - ts.sx);
+        }
+
+        if (ts.progress >= 1) {
+            let p = playersRef.current[ts.ownerId];
+            if (p && p.status !== 'dead') {
+                p.gold += 130000;
+                if (p.id === myId) {
+                    pushNotification("Trade ship arrived! +130k Gold");
+                    particlesRef.current.push({
+                        x: ts.tx, y: ts.ty - 10,
+                        vx: 0, vy: -0.5,
+                        life: 1.0, maxLife: 1.0,
+                        color: '#fde047', size: 10, type: 'fx', text: "+130K"
+                    });
+                }
+            }
+            tradeShipsRef.current.splice(i, 1);
+        }
+    }
+
+    // Process Trains
+    for (let i = trainsRef.current.length - 1; i >= 0; i--) {
+        let t = trainsRef.current[i];
+        t.progress += t.speed * dtScale;
+        if (t.progress >= 1) {
+            let p = playersRef.current[t.ownerId];
+            if (p && p.status !== 'dead') {
+                let count = 0;
+                // Quick count hack
+                for (let j of activeCellsRef.current) {
+                    if (gridRef.current[j].ownerId === p.id) count++;
+                }
+                // Reward scaled by distance travelled and empire size
+                let dist = Math.hypot(t.tx-t.sx, t.ty-t.sy) / CELL_SIZE;
+                let reward = 5000 + (Math.floor(dist) * 50);
+                p.gold += reward;
+                // Show floating text if it's the player
+                if (p.id === myId) {
+                    let textAmount = reward >= 1000 ? `+${(reward/1000).toFixed(1)}K` : `+${Math.floor(reward)}`;
+                    particlesRef.current.push({
+                        x: t.tx, y: t.ty - 10,
+                        vx: 0, vy: -0.5,
+                        life: 1.0, maxLife: 1.0,
+                        color: '#fbbf24', size: 10, type: 'fx', text: textAmount
+                    });
+                }
+            }
+            trainsRef.current.splice(i, 1);
+        } else {
+            let dx = t.tx - t.sx;
+            let dy = t.ty - t.sy;
+            let adx = Math.abs(dx);
+            let ady = Math.abs(dy);
+            let totalD = adx + ady;
+            if (totalD === 0) totalD = 1;
+            let pX = adx / totalD; // fraction of distance/time spent on X axis
+
+            if (t.progress <= pX && pX > 0) {
+                // Moving on X axis
+                t.px = t.sx + dx * (t.progress / pX);
+                t.py = t.sy;
+                t.angle = dx > 0 ? 0 : Math.PI;
+            } else {
+                // Moving on Y axis
+                t.px = t.tx;
+                let yProg = pX < 1 ? (t.progress - pX) / (1 - pX) : 1;
+                t.py = t.sy + dy * yProg;
+                t.angle = dy > 0 ? Math.PI/2 : -Math.PI/2;
+            }
+        }
+    }
+
+  };
 
   const gameTick = () => {
     frameCountRef.current++;
@@ -880,7 +1136,8 @@ export default function WorldFrontGame({ onExit, t }: WorldFrontProps) {
       }
       
       // Economy
-      let income = (myCells.length * 0.1) + (cityCount * 2) + (factoryCount * 5);
+      let resourceIncome = myCells.filter(c => c.resource === 'gold').length * 25;
+      let income = (myCells.length * 0.1) + (cityCount * 2) + (factoryCount * 5) + resourceIncome;
       p.gold += income;
 
       // Trains (Eisenbahnen)
@@ -1136,9 +1393,34 @@ export default function WorldFrontGame({ onExit, t }: WorldFrontProps) {
                   let autoTargetForce = Math.floor(p.pop * 0.3);
                   let currentBorders = getMyBorders();
                   if (currentBorders.length > 0) {
-                      let randomBorder = currentBorders[Math.floor(Math.random() * currentBorders.length)];
+                      let bestBorder = currentBorders[0];
+                      let maxScore = -99999;
+                      
+                      for (let b of currentBorders) {
+                          let cell = grid[b.dest.idx];
+                          let score = Math.random() * 20; // Base random factor
+                          
+                          // Priorities based on map layout and player tactics
+                          if (cell.resource === 'gold') score += 100;
+                          if (cell.resource === 'oil') score += 50;
+                          if (!cell.ownerId && cell.hp < 15) score += 30; // easy to take
+                          
+                          if (cell.ownerId === 'p1') {
+                              if (p.pop > p.maxPop * 0.6) score += 120; // Attack player aggressively if strong
+                              else score -= 40; // Avoid player if weak
+                          }
+                          
+                          if (cell.building === 'city' || cell.building === 'factory') score += 150;
+                          if (cell.building === 'silo' || cell.building === 'defense') score += 200; // Prioritize strategic targets
+                          
+                          if (score > maxScore) {
+                              maxScore = score;
+                              bestBorder = b;
+                          }
+                      }
+                      
                       p.pop -= autoTargetForce;
-                      p.offensiveWaves.push({ troops: autoTargetForce, target: {x: randomBorder.dest.x, y: randomBorder.dest.y}, targetOwnerId: randomBorder.dest.ownerId });
+                      p.offensiveWaves.push({ troops: autoTargetForce, target: {x: bestBorder.dest.x, y: bestBorder.dest.y}, targetOwnerId: bestBorder.dest.ownerId });
                   }
               }
 
@@ -1206,356 +1488,7 @@ export default function WorldFrontGame({ onExit, t }: WorldFrontProps) {
       }
     });
     
-    // Process Particles
-    for (let i = particlesRef.current.length - 1; i >= 0; i--) {
-        let p = particlesRef.current[i];
-        
-        if (p.type === 'ship') {
-            let avoiding = false;
-            p.age = (p.age || 0) + 1;
-            
-            // Self-destruct/refund if stuck too long (e.g. 1000 ticks)
-            if (p.age > 1000) {
-                if (p.ownerId && p.payload) players[p.ownerId].pop += p.payload;
-                particlesRef.current.splice(i, 1);
-                continue;
-            }
-
-            let tc = p.targetCell !== undefined ? grid[p.targetCell] : null;
-            let tx = tc ? tc.x * CELL_SIZE + CELL_SIZE/2 : p.x;
-            let ty = tc ? tc.y * CELL_SIZE + CELL_SIZE/2 : p.y;
-            let distToTarget = Math.hypot(p.x - tx, p.y - ty);
-
-            // Improved land avoidance
-            let lookAhead = 15;
-            let checkX = Math.floor((p.x + p.vx * lookAhead) / CELL_SIZE);
-            let checkY = Math.floor((p.y + p.vy * lookAhead) / CELL_SIZE);
-            
-            if (distToTarget > 40 && checkX >= 0 && checkX < GRID_W && checkY >= 0 && checkY < GRID_H) {
-                let cellAhead = grid[getCellIndex(checkX, checkY)];
-                if (cellAhead.type !== 'water' && p.targetCell !== cellAhead.idx) {
-                    // Check left and right to see which way is clearer
-                    let speed = Math.hypot(p.vx, p.vy);
-                    let baseAngle = Math.atan2(p.vy, p.vx);
-                    
-                    let leftClear = true;
-                    let rightClear = true;
-                    
-                    // Sample left
-                    let la = baseAngle - 0.5;
-                    let lcx = Math.floor((p.x + Math.cos(la) * lookAhead) / CELL_SIZE);
-                    let lcy = Math.floor((p.y + Math.sin(la) * lookAhead) / CELL_SIZE);
-                    if (lcx>=0 && lcx<GRID_W && lcy>=0 && lcy<GRID_H && grid[getCellIndex(lcx, lcy)].type !== 'water') leftClear = false;
-                    
-                    // Sample right
-                    let ra = baseAngle + 0.5;
-                    let rcx = Math.floor((p.x + Math.cos(ra) * lookAhead) / CELL_SIZE);
-                    let rcy = Math.floor((p.y + Math.sin(ra) * lookAhead) / CELL_SIZE);
-                    if (rcx>=0 && rcx<GRID_W && rcy>=0 && rcy<GRID_H && grid[getCellIndex(rcx, rcy)].type !== 'water') rightClear = false;
-
-                    let steer = 0.2;
-                    if (!leftClear && rightClear) steer = 0.4;
-                    else if (leftClear && !rightClear) steer = -0.4;
-                    else if (!leftClear && !rightClear) steer = 0.6; // both blocked, hard right
-                    else {
-                        // both clear or both blocked similarly, steer towards target
-                        let targetAngle = Math.atan2(ty - p.y, tx - p.x);
-                        let diff = targetAngle - baseAngle;
-                        while(diff > Math.PI) diff -= Math.PI*2;
-                        while(diff < -Math.PI) diff += Math.PI*2;
-                        steer = diff > 0 ? 0.3 : -0.3;
-                    }
-
-                    let a = baseAngle + steer;
-                    p.vx = Math.cos(a) * speed;
-                    p.vy = Math.sin(a) * speed;
-                    avoiding = true;
-                }
-            }
-            
-            if (!avoiding && tc) {
-                let currentSpeed = Math.hypot(p.vx, p.vy);
-                let targetAngle = Math.atan2(ty - p.y, tx - p.x);
-                let currentAngle = Math.atan2(p.vy, p.vx);
-                let diff = targetAngle - currentAngle;
-                while (diff > Math.PI) diff -= Math.PI * 2;
-                while (diff < -Math.PI) diff += Math.PI * 2;
-                
-                let a = currentAngle + diff * 0.15; // Steer slightly more aggressively
-                p.vx = Math.cos(a) * currentSpeed;
-                p.vy = Math.sin(a) * currentSpeed;
-            }
-            
-            if (p.path) {
-                let lastP = p.path[p.path.length-1];
-                if (Math.hypot(p.x - lastP.x, p.y - lastP.y) > 10) {
-                    p.path.push({x: p.x, y: p.y});
-                }
-            }
-        }
-        
-        p.x += p.vx; p.y += p.vy;
-        
-        let cx = Math.floor(p.x / CELL_SIZE);
-        let cy = Math.floor(p.y / CELL_SIZE);
-        if (cx >= 0 && cx < GRID_W && cy >= 0 && cy < GRID_H) {
-            let currentCell = grid[getCellIndex(cx, cy)];
-            if (p.type === 'ship' && currentCell.type !== 'water' && currentCell.ownerId !== p.ownerId) {
-                p.targetCell = currentCell.idx; // force landing on this coast
-            }
-        }
-        
-        if ((p.type === 'troop' || p.type === 'ship') && p.targetCell !== undefined && p.ownerId && p.payload) {
-            let tc = grid[p.targetCell];
-            let tx = tc.x * CELL_SIZE + CELL_SIZE/2;
-            let ty = tc.y * CELL_SIZE + CELL_SIZE/2;
-            let dist = Math.sqrt(Math.pow(p.x - tx, 2) + Math.pow(p.y - ty, 2));
-            let speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-            
-            if (p.type === 'ship' && Math.random() < 0.1) {
-                // Ship wake
-                particlesRef.current.push({ x: p.x, y: p.y, vx: 0, vy: 0, life: 1, maxLife: 1, color: '#93c5fd', size: 2, type: 'fx' });
-            }
-
-            let hitDist = p.type === 'ship' ? speed + CELL_SIZE * 4 : speed + CELL_SIZE;
-            if (dist < hitDist) {
-                // Impact - Ships can only impact land or its actual target cell if it reached it
-                if (p.type === 'ship' && tc.type === 'water') {
-                    // Reached target water cell but no land yet? Look for adjacent land.
-                    let getSafe = (x:number, y:number) => (x>=0 && x<GRID_W && y>=0 && y<GRID_H) ? grid[y * GRID_W + x] : null;
-                    let adjs = [
-                        getSafe(tc.x+1, tc.y), getSafe(tc.x-1, tc.y),
-                        getSafe(tc.x, tc.y+1), getSafe(tc.x, tc.y-1)
-                    ].filter(c => c && c.type !== 'water');
-                    if (adjs.length > 0) {
-                        p.targetCell = adjs[0].idx; // Shift target to nearest land
-                        continue; // try again next frame
-                    }
-                }
-
-                if (tc.ownerId !== p.ownerId) {
-                    let isProtected = false;
-                    if (tc.ownerId && defensesByOwner[tc.ownerId]) {
-                        for (let d of defensesByOwner[tc.ownerId]) {
-                            if (Math.hypot(d.x - tc.x, d.y - tc.y) <= 15) { isProtected = true; break; }
-                        }
-                    }
-                    let multiplier = isProtected ? 10 : 1;
-                    
-                    let cellMaxHp = tc.ownerId ? 20 + (tc.building ? 20 : 0) : (tc.type === 'mountains' ? 50 : WILDERNESS_HP);
-                    let effectivePayload = Math.floor(p.payload / multiplier);
-                    if (effectivePayload < 1) effectivePayload = 1;
-                    
-                    let dmg = Math.min(tc.hp, effectivePayload);
-                    tc.hp -= dmg;
-                    
-                    if (tc.hp <= 0) {
-                        let excess = p.payload - (dmg * multiplier);
-                        if (excess < 0) excess = 0;
-                        let oldOwner = tc.ownerId;
-                        if (oldOwner) {
-                            players[oldOwner].lastAttackerId = p.ownerId;
-                        }
-                        setCellOwner(tc, p.ownerId);
-                        tc.hp = 20;
-                        setCellBuilding(tc, null);
-                        
-                        if (excess > 0) {
-                            let cx = tc.x; let cy = tc.y;
-                            let getSafe = (x:number, y:number) => (x>=0 && x<GRID_W && y>=0 && y<GRID_H) ? grid[y * GRID_W + x] : null;
-                            let adjs = [
-                                getSafe(cx+1, cy), getSafe(cx-1, cy),
-                                getSafe(cx, cy+1), getSafe(cx, cy-1)
-                            ].filter(c => c && c.type !== 'water' && c.ownerId !== p.ownerId);
-                            
-                            if (adjs.length > 0) {
-                                let payloadPerDir = Math.floor(excess / adjs.length);
-                                let remainder = excess % adjs.length;
-                                let first = true;
-                                
-                                for (let j=0; j<adjs.length; j++) {
-                                    let nextTarget = adjs[j];
-                                    let pload = payloadPerDir + (first ? remainder : 0);
-                                    if (pload <= 0) continue;
-                                    
-                                    let tx2 = nextTarget.x * CELL_SIZE + CELL_SIZE/2;
-                                    let ty2 = nextTarget.y * CELL_SIZE + CELL_SIZE/2;
-                                    let dx2 = tx2 - p.x; let dy2 = ty2 - p.y;
-                                    let len = Math.sqrt(dx2*dx2 + dy2*dy2) || 1;
-                                    let spd = p.type === 'ship' ? 1.5 : 2;
-                                    
-                                    if (first) {
-                                        p.payload = pload;
-                                        p.targetCell = nextTarget.idx;
-                                        p.vx = (dx2/len)*spd;
-                                        p.vy = (dy2/len)*spd;
-                                        first = false;
-                                    } else {
-                                        particlesRef.current.push({
-                                            x: p.x, y: p.y,
-                                            vx: (dx2/len)*spd, vy: (dy2/len)*spd,
-                                            life: 1, maxLife: 1, color: p.color,
-                                            size: p.size, type: p.type, ownerId: p.ownerId,
-                                            targetCell: nextTarget.idx, payload: pload
-                                        });
-                                    }
-                                }
-                                if (!first) continue; // we reused 'p', so skip destroying it
-                            }
-                            // If we didn't branch (adjs.length === 0 or payload too small), refund remainder
-                            players[p.ownerId].pop += excess;
-                        }
-                    } else {
-                        // hit spark removed
-                    }
-                } else {
-                    players[p.ownerId].pop += p.payload; // Refund if hit own cell
-                }
-                particlesRef.current.splice(i, 1);
-                continue;
-            }
-        } else {
-            p.life -= 0.05;
-            if (p.life <= 0) particlesRef.current.splice(i, 1);
-        }
-    }
-
-    // Process Nukes
-    for (let i = projectilesRef.current.length - 1; i >= 0; i--) {
-        let proj = projectilesRef.current[i];
-        proj.progress += 0.01;
-        proj.x = proj.startX + (proj.targetX - proj.startX) * proj.progress;
-        proj.y = proj.startY + (proj.targetY - proj.startY) * proj.progress;
-        spawnFX(proj.x, proj.y, '#fef08a', 2, 1);
-        
-        if (proj.progress >= 1) {
-            sounds.nukeExplode();
-            let tx = Math.floor(proj.targetX/CELL_SIZE);
-            let ty = Math.floor(proj.targetY/CELL_SIZE);
-            
-            // detonate radius 5
-            for (let y = ty - 5; y <= ty + 5; y++) {
-                for (let x = tx - 5; x <= tx + 5; x++) {
-                    let d = Math.sqrt((x-tx)**2 + (y-ty)**2);
-                    if (d <= 5) {
-                        let c = grid[getCellIndex(x, y)];
-                        if (c && c.type !== 'water') {
-                            setCellOwner(c, null);
-                            setCellBuilding(c, null);
-                            c.hp = c.type === 'mountains' ? 50 : WILDERNESS_HP;
-                        }
-                    }
-                }
-            }
-            spawnFX(tx*CELL_SIZE, ty*CELL_SIZE, '#ffffff', 50, 10);
-            spawnFX(tx*CELL_SIZE, ty*CELL_SIZE, '#f97316', 80, 6);
-            pushNotification(`Nuclear Detonation!`);
-            projectilesRef.current.splice(i, 1);
-        }
-    }
-
-    // Process Trade Ships
-    for (let i = tradeShipsRef.current.length - 1; i >= 0; i--) {
-        let ts = tradeShipsRef.current[i];
-        
-        if (ts.path && ts.pathIndex !== undefined && ts.pathIndex < ts.path.length) {
-            let targetNode = ts.path[ts.pathIndex];
-            let tpx = targetNode.x * CELL_SIZE + CELL_SIZE/2;
-            let tpy = targetNode.y * CELL_SIZE + CELL_SIZE/2;
-            let dist = Math.hypot(tpx - ts.px, tpy - ts.py);
-            
-            let moveAmount = 2.0; // 2 pixels per tick
-            
-            if (dist <= moveAmount) {
-                ts.px = tpx;
-                ts.py = tpy;
-                ts.pathIndex++;
-                if (ts.pathIndex >= ts.path.length) {
-                    ts.progress = 1.0;
-                }
-            } else {
-                let ang = Math.atan2(tpy - ts.py, tpx - ts.px);
-                ts.px += Math.cos(ang) * moveAmount;
-                ts.py += Math.sin(ang) * moveAmount;
-                ts.angle = ang;
-            }
-        } else {
-            ts.progress += ts.speed;
-            ts.px = ts.sx + (ts.tx - ts.sx) * ts.progress;
-            ts.py = ts.sy + (ts.ty - ts.sy) * ts.progress;
-            ts.angle = Math.atan2(ts.ty - ts.sy, ts.tx - ts.sx);
-        }
-
-        if (ts.progress >= 1) {
-            let p = playersRef.current[ts.ownerId];
-            if (p && p.status !== 'dead') {
-                p.gold += 130000;
-                if (p.id === myId) {
-                    pushNotification("Trade ship arrived! +130k Gold");
-                    particlesRef.current.push({
-                        x: ts.tx, y: ts.ty - 10,
-                        vx: 0, vy: -0.5,
-                        life: 1.0, maxLife: 1.0,
-                        color: '#fde047', size: 10, type: 'fx', text: "+130K"
-                    });
-                }
-            }
-            tradeShipsRef.current.splice(i, 1);
-        }
-    }
-
-    // Process Trains
-    for (let i = trainsRef.current.length - 1; i >= 0; i--) {
-        let t = trainsRef.current[i];
-        t.progress += t.speed;
-        if (t.progress >= 1) {
-            let p = playersRef.current[t.ownerId];
-            if (p && p.status !== 'dead') {
-                let count = 0;
-                // Quick count hack
-                for (let j of activeCellsRef.current) {
-                    if (gridRef.current[j].ownerId === p.id) count++;
-                }
-                // Reward scaled by distance travelled and empire size
-                let dist = Math.hypot(t.tx-t.sx, t.ty-t.sy) / CELL_SIZE;
-                let reward = 5000 + (Math.floor(dist) * 50);
-                p.gold += reward;
-                // Show floating text if it's the player
-                if (p.id === myId) {
-                    let textAmount = reward >= 1000 ? `+${(reward/1000).toFixed(1)}K` : `+${Math.floor(reward)}`;
-                    particlesRef.current.push({
-                        x: t.tx, y: t.ty - 10,
-                        vx: 0, vy: -0.5,
-                        life: 1.0, maxLife: 1.0,
-                        color: '#fbbf24', size: 10, type: 'fx', text: textAmount
-                    });
-                }
-            }
-            trainsRef.current.splice(i, 1);
-        } else {
-            let dx = t.tx - t.sx;
-            let dy = t.ty - t.sy;
-            let adx = Math.abs(dx);
-            let ady = Math.abs(dy);
-            let totalD = adx + ady;
-            if (totalD === 0) totalD = 1;
-            let pX = adx / totalD; // fraction of distance/time spent on X axis
-
-            if (t.progress <= pX && pX > 0) {
-                // Moving on X axis
-                t.px = t.sx + dx * (t.progress / pX);
-                t.py = t.sy;
-                t.angle = dx > 0 ? 0 : Math.PI;
-            } else {
-                // Moving on Y axis
-                t.px = t.tx;
-                let yProg = pX < 1 ? (t.progress - pX) / (1 - pX) : 1;
-                t.py = t.sy + dy * yProg;
-                t.angle = dy > 0 ? Math.PI/2 : -Math.PI/2;
-            }
-        }
-    }
-  };
+      };
 
   const draw = () => {
     const canvas = canvasRef.current;
@@ -1997,9 +1930,19 @@ export default function WorldFrontGame({ onExit, t }: WorldFrontProps) {
     // No minimap
   };
 
-  useEffect(() => {
+    // Need lastFrameTimeRef
+  const lastFrameTimeRef = useRef<number>(0);
+useEffect(() => {
     let animationId: number;
     const loop = (time: number) => {
+      
+      if (!lastFrameTimeRef.current) lastFrameTimeRef.current = time;
+      let dt = time - lastFrameTimeRef.current;
+      lastFrameTimeRef.current = time;
+      // Cap dt to prevent huge jumps if tab was inactive
+      if (dt > 100) dt = 100;
+      updatePhysics(dt);
+
       if (time - lastTickRef.current > 50) { // faster logic ticks
          gameTick();
          lastTickRef.current = time;
@@ -2344,30 +2287,35 @@ export default function WorldFrontGame({ onExit, t }: WorldFrontProps) {
                    let targetIsCoast = adjsTarget.some(a => a && a.type === 'water');
                    
                    if (!targetIsCoast) {
-                       let searchRadius = 1;
-                       let found = false;
-                       while (searchRadius <= 20 && !found) {
-                           for(let dx=-searchRadius; dx<=searchRadius; dx++){
-                               for(let dy=-searchRadius; dy<=searchRadius; dy++){
-                                   let cx = cell.x+dx; let cy = cell.y+dy;
-                                   let c = getSafe(cx, cy);
-                                   if (c && c.type !== 'water') {
-                                       let cAdjs = [
-                                           getSafe(c.x+1,c.y), getSafe(c.x-1,c.y),
-                                           getSafe(c.x,c.y+1), getSafe(c.x,c.y-1)
-                                       ];
-                                       if (cAdjs.some(a => a && a.type === 'water')) {
-                                           tx = c.x; ty = c.y; found = true; break;
+                       let queue = [{x: cell.x, y: cell.y}];
+                       let visited = new Set<string>([`${cell.x},${cell.y}`]);
+                       let foundCoast = null;
+                       while (queue.length > 0) {
+                           let curr = queue.shift()!;
+                           if (Math.abs(curr.x - cell.x) + Math.abs(curr.y - cell.y) > 25) continue;
+                           let c = getSafe(curr.x, curr.y);
+                           if (c && c.type !== 'water') {
+                               let cAdjs = [
+                                   getSafe(curr.x+1,curr.y), getSafe(curr.x-1,curr.y),
+                                   getSafe(curr.x,curr.y+1), getSafe(curr.x,curr.y-1)
+                               ];
+                               if (cAdjs.some(a => a && a.type === 'water')) {
+                                   foundCoast = curr; break;
+                               }
+                               for (let a of cAdjs) {
+                                   if (a && a.type !== 'water') {
+                                       let key = `${a.x},${a.y}`;
+                                       if (!visited.has(key)) {
+                                           visited.add(key); queue.push({x: a.x, y: a.y});
                                        }
                                    }
                                }
-                               if(found) break;
                            }
-                           searchRadius++;
                        }
-                       if (!found) {
+                       if (!foundCoast) {
                            return; // Failed to find coast
                        }
+                       tx = foundCoast.x; ty = foundCoast.y;
                    }
                    
                    coastalCells.sort((a,b) => Math.pow(a.x - tx, 2) + Math.pow(a.y - ty, 2) - (Math.pow(b.x - tx, 2) + Math.pow(b.y - ty, 2)));
@@ -2474,30 +2422,42 @@ export default function WorldFrontGame({ onExit, t }: WorldFrontProps) {
         let targetIsCoast = adjsTarget.some(a => a && a.type === 'water');
         
         if (!targetIsCoast) {
-            let searchRadius = 1;
-            let found = false;
-            while (searchRadius <= 20 && !found) {
-                for(let dx=-searchRadius; dx<=searchRadius; dx++){
-                    for(let dy=-searchRadius; dy<=searchRadius; dy++){
-                        let cx = cell.x+dx; let cy = cell.y+dy;
-                        let c = getSafe(cx, cy);
-                        if (c && c.type !== 'water') {
-                            let cAdjs = [
-                                getSafe(c.x+1,c.y), getSafe(c.x-1,c.y),
-                                getSafe(c.x,c.y+1), getSafe(c.x,c.y-1)
-                            ];
-                            if (cAdjs.some(a => a && a.type === 'water')) {
-                                tx = c.x; ty = c.y; found = true; break;
+            let queue = [{x: cell.x, y: cell.y}];
+            let visited = new Set<string>([`${cell.x},${cell.y}`]);
+            let foundCoast = null;
+            
+            while(queue.length > 0) {
+                let curr = queue.shift()!;
+                if (Math.abs(curr.x - cell.x) + Math.abs(curr.y - cell.y) > 25) continue;
+                
+                let c = getSafe(curr.x, curr.y);
+                if (c && c.type !== 'water') {
+                    let cAdjs = [
+                        getSafe(curr.x+1,curr.y), getSafe(curr.x-1,curr.y),
+                        getSafe(curr.x,curr.y+1), getSafe(curr.x,curr.y-1)
+                    ];
+                    if (cAdjs.some(a => a && a.type === 'water')) {
+                        foundCoast = curr;
+                        break;
+                    }
+                    for (let a of cAdjs) {
+                        if (a && a.type !== 'water') {
+                            let key = `${a.x},${a.y}`;
+                            if (!visited.has(key)) {
+                                visited.add(key);
+                                queue.push({x: a.x, y: a.y});
                             }
                         }
                     }
-                    if(found) break;
                 }
-                searchRadius++;
             }
-            if (!found) {
+            
+            if (foundCoast) {
+                tx = foundCoast.x; 
+                ty = foundCoast.y;
+            } else {
                 setContextMenu(null);
-                return;
+                return; // Failed to find coast
             }
         }
 

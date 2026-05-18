@@ -1,5 +1,6 @@
 {
   "name": "BlitzPlay",
-  "description": "BlitzPlay ist die ultimative Mini-Game-Plattform mit KI-Integration, Multiplayer-Duellen und blitzschneller Action. Play Fast. Play Smart.",
-  "requestFramePermissions": []
+  "description": "BlitzPlay ist die ultimative Mini-Game-Plattform mit KI-Integration, Multiplayer-Duellen und blitzschneller Action.",
+  "requestFramePermissions": ["pointer-lock"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
