@@ -20,8 +20,7 @@ import {
   LayoutGrid,
   Trash2,
   X,
-  Home,
-  Settings as SettingsIcon
+  Home
 } from 'lucide-react';
 import { translations, Language } from './translations';
 import PartyGame from './components/PartyGame';
@@ -31,8 +30,6 @@ import ChessGame from './components/ChessGame';
 import neonMemoryThumb from './neon-memory.svg';
 import towerDefenseThumb from './tower-defense.svg';
 import partyQuizThumb from './party-quiz.svg';
-import SettingsModal from './SettingsModal';
-import { useSettings } from './SettingsContext';
 
 // --- Types ---
 interface Game {
@@ -201,7 +198,6 @@ const GameCard = ({ game, t, onClick, onDelete }: { game: Game, t: any, onClick:
 };
 
 export default function App() {
-  const { settings } = useSettings();
   const [lang, setLang] = useState<Language>('de');
   const [page, setPage] = useState<'home' | 'games' | 'create'>('home');
   const [filter, setFilter] = useState('all');
@@ -218,7 +214,6 @@ export default function App() {
   const [customImage, setCustomImage] = useState<string | null>(null);
   const [useAiImage, setUseAiImage] = useState(true);
   const [isLangOpen, setIsLangOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [footerModal, setFooterModal] = useState<'privacy' | 'terms' | 'support' | 'api' | null>(null);
 
@@ -301,16 +296,10 @@ export default function App() {
         try {
           result = JSON.parse(resText);
         } catch (err) {
-          if (resText.trim().startsWith('<')) {
-            throw new Error(`Die Webseite läuft im statischen Modus ohne Backend. Bitte öffne die Einstellungen (Zahnrad-Symbol oben rechts) und füge deinen Gemini API Key ein, um diese Funktion zu nutzen.`);
-          }
           throw new Error(`Invalid server response: ${resText.substring(0, 100)}`);
         }
 
         if (!resp.ok) {
-          if (result.error && result.error.includes("GEMINI_API_KEY")) {
-             throw new Error(`Server API Key fehlt. Bitte öffne die Einstellungen (Zahnrad-Symbol oben rechts) und füge deinen eigenen Gemini API Key ein.`);
-          }
           throw new Error(result.error || result.message || `Server returned ${resp.status}`);
         }
         
@@ -340,9 +329,6 @@ export default function App() {
       console.error("Error generating game:", error);
       setIsGenerating(false);
       setGenerationError(error.message || "Failed to generate game");
-      if (error.message?.includes("API Key") || error.message?.includes("Zahnrad") || error.message?.includes("statischen")) {
-        setIsSettingsOpen(true);
-      }
     }
   };
 
@@ -878,14 +864,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
-            
-            {/* Settings Button */}
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
-            >
-              <SettingsIcon size={20} className="text-white/80" />
-            </button>
 
             <div className="relative">
               <button 
@@ -1287,7 +1265,6 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
-        <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} lang={lang} />
       </main>
 
       {/* Footer */}
