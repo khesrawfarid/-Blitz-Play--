@@ -195,30 +195,63 @@ async function startServer() {
       const ai = new GoogleGenAI({ apiKey: apiKey });
 
       console.log(`[SERVER AI] Calling Gemini for prompt: ${prompt.substring(0, 50)}...`);
-      const responseObj = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: `Create a simple, playable HTML5 game based on this prompt: "${prompt}". 
-        The game should be fully contained in a single HTML string (including CSS and JS). 
-        It should be responsive, use modern graphics (canvas or DOM), and be playable with mouse/touch or keyboard.
-        Also provide a short, descriptive prompt for an AI image generator to create a thumbnail for this game.`,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    htmlCode: {
-                        type: Type.STRING,
-                        description: "The complete HTML code for the game, including <style> and <script> tags."
+      let responseObj;
+      try {
+        responseObj = await ai.models.generateContent({
+          model: "gemini-2.0-flash",
+          contents: `Create a simple, playable HTML5 game based on this prompt: "${prompt}". 
+          The game should be fully contained in a single HTML string (including CSS and JS). 
+          It should be responsive, use modern graphics (canvas or DOM), and be playable with mouse/touch or keyboard.
+          Also provide a short, descriptive prompt for an AI image generator to create a thumbnail for this game.`,
+          config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                      htmlCode: {
+                          type: Type.STRING,
+                          description: "The complete HTML code for the game, including <style> and <script> tags."
+                      },
+                      imagePrompt: {
+                          type: Type.STRING,
+                          description: "A prompt for an image generator to create a thumbnail for this game."
+                      }
+                  },
+                  required: ["htmlCode", "imagePrompt"]
+              }
+          }
+        });
+      } catch (err: any) {
+        if (err.status === 429 || err?.message?.includes("429") || err?.message?.includes("quota")) {
+          console.warn("[SERVER AI] Quota exceeded for gemini-2.0-flash. Falling back to gemini-2.0-flash-lite-preview-02-05...");
+          responseObj = await ai.models.generateContent({
+            model: "gemini-2.0-flash-lite-preview-02-05",
+            contents: `Create a simple, playable HTML5 game based on this prompt: "${prompt}". 
+            The game should be fully contained in a single HTML string (including CSS and JS). 
+            It should be responsive, use modern graphics (canvas or DOM), and be playable with mouse/touch or keyboard.
+            Also provide a short, descriptive prompt for an AI image generator to create a thumbnail for this game.`,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        htmlCode: {
+                            type: Type.STRING,
+                            description: "The complete HTML code for the game, including <style> and <script> tags."
+                        },
+                        imagePrompt: {
+                            type: Type.STRING,
+                            description: "A prompt for an image generator to create a thumbnail for this game."
+                        }
                     },
-                    imagePrompt: {
-                        type: Type.STRING,
-                        description: "A prompt for an image generator to create a thumbnail for this game."
-                    }
-                },
-                required: ["htmlCode", "imagePrompt"]
+                    required: ["htmlCode", "imagePrompt"]
+                }
             }
+          });
+        } else {
+          throw err;
         }
-      });
+      }
       
       let text = responseObj.text;
       let generatedData;
