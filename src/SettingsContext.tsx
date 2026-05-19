@@ -6,6 +6,7 @@ export interface AppSettings {
   mouseSensitivity: number;
   graphicsQuality: GraphicsQuality;
   audioLevel: number;
+  geminiApiKey: string;
 }
 
 interface SettingsContextType {
@@ -17,6 +18,7 @@ const defaultSettings: AppSettings = {
   mouseSensitivity: 1,
   graphicsQuality: 'high',
   audioLevel: 1.0,
+  geminiApiKey: '',
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);

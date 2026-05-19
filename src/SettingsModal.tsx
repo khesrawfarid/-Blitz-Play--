@@ -132,6 +132,25 @@ export default function SettingsModal({ isOpen, onClose, lang }: SettingsModalPr
                   className="w-full accent-play-blue h-2 bg-white/10 rounded-full appearance-none outline-none"
                 />
               </div>
+
+              {/* API Key */}
+              <div>
+                <div className="flex justify-between items-end mb-2">
+                   <label className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                     Gemini API Key
+                   </label>
+                </div>
+                <input
+                   type="password"
+                   placeholder="AIzaSy..."
+                   value={settings.geminiApiKey || ''}
+                   onChange={(e) => updateSettings({ geminiApiKey: e.target.value })}
+                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-play-blue/50"
+                />
+                <p className="text-xs text-white/50 mt-2">
+                  Only required if the server API fails or you are running this statically.
+                </p>
+              </div>
             </div>
           </motion.div>
         </div>

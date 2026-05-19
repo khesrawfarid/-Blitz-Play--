@@ -184,7 +184,7 @@ async function startServer() {
       }
 
       // Read from process env
-      const apiKey = process.env.GEMINI_API_KEY || process.env.MEIN_NEUER_KEY || process.env.GOOGLE_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY || process.env.MEIN_KEY || process.env.MEIN_NEUER_KEY || process.env.GOOGLE_API_KEY;
       
       if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.includes("your-api-key")) {
         console.error("GEMINI_API_KEY is missing or invalid on the server.");
@@ -192,10 +192,16 @@ async function startServer() {
         return;
       }
       
-      const ai = new GoogleGenAI(apiKey);
-      const model = ai.getGenerativeModel({
-        model: "gemini-1.5-flash",
-        generationConfig: {
+      const ai = new GoogleGenAI({ apiKey: apiKey });
+
+      console.log(`[SERVER AI] Calling Gemini for prompt: ${prompt.substring(0, 50)}...`);
+      const responseObj = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Create a simple, playable HTML5 game based on this prompt: "${prompt}". 
+        The game should be fully contained in a single HTML string (including CSS and JS). 
+        It should be responsive, use modern graphics (canvas or DOM), and be playable with mouse/touch or keyboard.
+        Also provide a short, descriptive prompt for an AI image generator to create a thumbnail for this game.`,
+        config: {
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.OBJECT,
@@ -209,26 +215,31 @@ async function startServer() {
                         description: "A prompt for an image generator to create a thumbnail for this game."
                     }
                 },
-                required: ["htmlCode", "imagePrompt"],
+                required: ["htmlCode", "imagePrompt"]
             }
         }
       });
-
-      console.log(`[SERVER AI] Calling Gemini for prompt: ${prompt.substring(0, 50)}...`);
-      const result = await model.generateContent(`Create a simple, playable HTML5 game based on this prompt: "${prompt}". 
-        The game should be fully contained in a single HTML string (including CSS and JS). 
-        It should be responsive, use modern graphics (canvas or DOM), and be playable with mouse/touch or keyboard.
-        Also provide a short, descriptive prompt for an AI image generator to create a thumbnail for this game.`);
       
-      const response = await result.response;
-      const text = response.text();
-      const generatedData = JSON.parse(text);      
+      let text = responseObj.text;
+      let generatedData;
+      try {
+        // Sometimes the model wraps the JSON in markdown blocks
+        text = text.replace(/```json\n?|\n?```/g, "").trim();
+        generatedData = JSON.parse(text);      
+      } catch (parseError) {
+        console.warn("Failed to parse Gemini output as JSON. Sticking text into htmlCode. Text snippet:", text.substring(0, 100));
+        generatedData = {
+           htmlCode: text,
+           imagePrompt: prompt + " retro arcade game art"
+        };
+      }
       
       console.log("[SERVER AI] Successfully generated game data");
       res.json(generatedData);
     } catch (error: any) {
-      console.error("Gemini API Error:", error.message || error);
-      res.status(500).json({ error: "Failed to generate game. " + (error.message || "") });
+      console.error("Gemini API Error:", error.stack || error);
+      // Return 200 with an error object to prevent Nginx from intercepting 500/502 errors and returning HTML
+      res.json({ error: true, message: "Server API Error: " + (error.message || String(error)) });
     }
   };
 

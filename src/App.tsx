@@ -32,6 +32,7 @@ import neonMemoryThumb from './neon-memory.svg';
 import towerDefenseThumb from './tower-defense.svg';
 import partyQuizThumb from './party-quiz.svg';
 import SettingsModal from './SettingsModal';
+import { useSettings } from './SettingsContext';
 
 // --- Types ---
 interface Game {
@@ -200,6 +201,7 @@ const GameCard = ({ game, t, onClick, onDelete }: { game: Game, t: any, onClick:
 };
 
 export default function App() {
+  const { settings } = useSettings();
   const [lang, setLang] = useState<Language>('de');
   const [page, setPage] = useState<'home' | 'games' | 'create'>('home');
   const [filter, setFilter] = useState('all');
@@ -241,23 +243,81 @@ export default function App() {
     setGenerationError(null);
     
     try {
-      // Use absolute path to ensure we hit the server routes correctly
-      const url = '/api/generate-game';
-        
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ prompt: aiPrompt })
-      });
+      let result;
       
-      if (!resp.ok) {
-        const errorData = await resp.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server returned ${resp.status}`);
-      }
+      if (settings.geminiApiKey) {
+        // Use client-side generation if custom API key is set
+        const systemPrompt = `Create a simple, playable HTML5 game based on this prompt: "${aiPrompt}". 
+        The game should be fully contained in a single HTML string (including CSS and JS). 
+        It should be responsive, use modern graphics (canvas or DOM), and be playable with mouse/touch or keyboard.
+        Also provide a short, descriptive prompt for an AI image generator to create a thumbnail for this game.`;
+        
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${settings.geminiApiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: systemPrompt }] }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "OBJECT",
+                properties: {
+                  htmlCode: { type: "STRING" },
+                  imagePrompt: { type: "STRING" }
+                },
+                required: ["htmlCode", "imagePrompt"]
+              }
+            }
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+           throw new Error(data.error?.message || "Gemini API Error directly");
+        }
+        
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error("No text from Gemini");
+        
+        try {
+           result = JSON.parse(text.replace(/```json\n?|\n?```/g, "").trim());
+        } catch (e) {
+           result = { htmlCode: text, imagePrompt: aiPrompt + " retro game" };
+        }
+      } else {
+        // Use absolute path to ensure we hit the server routes correctly
+        const url = import.meta.env.BASE_URL + 'api/generate-game';
+          
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ prompt: aiPrompt })
+        });
+        
+        const resText = await resp.text();
+        try {
+          result = JSON.parse(resText);
+        } catch (err) {
+          if (resText.trim().startsWith('<')) {
+            throw new Error(`Die Webseite läuft im statischen Modus ohne Backend. Bitte öffne die Einstellungen (Zahnrad-Symbol oben rechts) und füge deinen Gemini API Key ein, um diese Funktion zu nutzen.`);
+          }
+          throw new Error(`Invalid server response: ${resText.substring(0, 100)}`);
+        }
 
-      const result = await resp.json();
+        if (!resp.ok) {
+          if (result.error && result.error.includes("GEMINI_API_KEY")) {
+             throw new Error(`Server API Key fehlt. Bitte öffne die Einstellungen (Zahnrad-Symbol oben rechts) und füge deinen eigenen Gemini API Key ein.`);
+          }
+          throw new Error(result.error || result.message || `Server returned ${resp.status}`);
+        }
+        
+        if (result.error === true || result.message?.startsWith('Server API Error')) {
+           throw new Error(result.message || "Unknown server error");
+        }
+      }
       
       const newGame: Game = {
         id: Date.now().toString(),
@@ -280,6 +340,9 @@ export default function App() {
       console.error("Error generating game:", error);
       setIsGenerating(false);
       setGenerationError(error.message || "Failed to generate game");
+      if (error.message?.includes("API Key") || error.message?.includes("Zahnrad") || error.message?.includes("statischen")) {
+        setIsSettingsOpen(true);
+      }
     }
   };
 
@@ -816,6 +879,14 @@ export default function App() {
 
           <div className="flex items-center gap-4">
             
+            {/* Settings Button */}
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+            >
+              <SettingsIcon size={20} className="text-white/80" />
+            </button>
+
             <div className="relative">
               <button 
                 onClick={() => setIsLangOpen(!isLangOpen)}
@@ -1216,6 +1287,7 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+        <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} lang={lang} />
       </main>
 
       {/* Footer */}
