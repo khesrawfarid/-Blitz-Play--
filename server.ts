@@ -184,7 +184,7 @@ async function startServer() {
       }
 
       // Read from process env
-      const apiKey = process.env.GEMINI_API_KEY || process.env.MEIN_KEY || process.env.MEIN_NEUER_KEY || process.env.GOOGLE_API_KEY;
+      const apiKey = process.env.MEIN_KEY || process.env.MEIN_NEUER_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
       
       if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.includes("your-api-key")) {
         console.error("GEMINI_API_KEY is missing or invalid on the server.");
